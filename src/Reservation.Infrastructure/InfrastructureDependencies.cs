@@ -1,7 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using Reservation.Application.Abstractions;
 using Reservation.Domain.Abstractions;
+using Reservation.Domain.Reservations;
 using Reservation.Infrastructure.Persistence;
+using Reservation.Infrastructure.Repositories;
 
 namespace Reservation.Infrastructure;
 
@@ -12,20 +13,25 @@ namespace Reservation.Infrastructure;
 /// </summary>
 public static class InfrastructureDependencies
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
-        // Register DbContext with PostgreSQL connection
-        // Will be configured in the API layer with AddDbContext<ReservationDbContext>
+        // Register specialized repositories
+        // IReservationRepository implementation with specialized queries
+        services.AddScoped<IReservationRepository, ReservationRepository>();
         
-        // Register repositories
-        // Example: services.AddScoped(typeof(IRepository<,>), typeof(GenericRepository<,>));
+        // Generic repository for any aggregate that needs standard CRUD
+        // Can be used for other aggregates in the future
+        services.AddScoped(typeof(IRepository<,>), typeof(GenericRepository<,>));
 
-        // Register Unit of Work
-        // services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ReservationDbContext>());
+        // Unit of Work is implemented by ReservationDbContext
+        // The DbContext is already registered in Program.cs via AddDbContext<ReservationDbContext>
+        // Here we just expose IUnitOfWork interface to the service provider
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ReservationDbContext>());
 
-        // Register Domain Event Publisher
+        // TODO: Domain Event Publisher
         // services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
 
         return services;
     }
 }
+

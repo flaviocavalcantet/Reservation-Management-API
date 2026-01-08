@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Reservation.Domain.Abstractions;
+using Reservation.Domain.Reservations;
 
 namespace Reservation.Infrastructure.Persistence;
 
@@ -11,8 +12,11 @@ namespace Reservation.Infrastructure.Persistence;
 /// </summary>
 public class ReservationDbContext : DbContext, IUnitOfWork
 {
-    // DbSets will be added here as aggregate roots are implemented
-    // Example: public DbSet<Reservation> Reservations { get; set; }
+    /// <summary>
+    /// DbSet for Reservation aggregate root.
+    /// All reservations in the system are accessed through this set.
+    /// </summary>
+    public DbSet<Domain.Reservations.Reservation> Reservations { get; set; }
 
     public ReservationDbContext(DbContextOptions<ReservationDbContext> options) : base(options)
     {

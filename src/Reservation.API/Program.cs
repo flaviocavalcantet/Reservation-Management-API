@@ -38,7 +38,7 @@ builder.Services.AddDbContext<ReservationDbContext>(options =>
     }));
 
 // Register infrastructure services
-builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddInfrastructure();
 
 // Add Swagger/OpenAPI with professional configuration
 builder.Services.AddEndpointsApiExplorer();

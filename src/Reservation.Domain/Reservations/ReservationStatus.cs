@@ -58,6 +58,23 @@ public class ReservationStatus : ValueObject
     /// </summary>
     public bool CanBeCancelled => Value != nameof(Cancelled);
 
+    /// <summary>
+    /// Indicates if this reservation has been confirmed.
+    /// Used for querying confirmed reservations.
+    /// </summary>
+    public bool IsConfirmed => Value == nameof(Confirmed);
+
+    /// <summary>
+    /// Indicates if this reservation has been cancelled.
+    /// Used for filtering out cancelled reservations.
+    /// </summary>
+    public bool IsCancelled => Value == nameof(Cancelled);
+
+    /// <summary>
+    /// Gets the name of the status for database storage and API responses.
+    /// </summary>
+    public string Name => Value;
+
     // ============ EQUALITY IMPLEMENTATION ============
     // Value Objects are compared by their values, not by reference
 
@@ -82,4 +99,10 @@ public class ReservationStatus : ValueObject
         nameof(Cancelled) => Cancelled,
         _ => throw new InvalidOperationException($"Invalid reservation status: '{status}'")
     };
+
+    /// <summary>
+    /// Factory method that creates a ReservationStatus from a string name.
+    /// Used by EF Core value object conversion.
+    /// </summary>
+    public static ReservationStatus FromName(string name) => FromString(name);
 }
