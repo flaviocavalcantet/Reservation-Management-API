@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using MediatR;
+using FluentValidation;
 using Reservation.Application.Behaviors;
 using Reservation.Infrastructure;
 using Reservation.Infrastructure.Persistence;
+using Reservation.API.Endpoints;
 
 // Create WebApplication builder - this creates the ASP.NET Core application host
 var builder = WebApplication.CreateBuilder(args);
@@ -11,11 +13,16 @@ var builder = WebApplication.CreateBuilder(args);
 // Follows Clean Architecture principle: Only Application layer knows about Domain layer
 // Infrastructure is injected via interfaces to maintain loose coupling
 
+// Add FluentValidation for request validation
+builder.Services.AddValidatorsFromAssemblyContaining(typeof(Program));
+
 // Add MediatR for CQRS pattern with behaviors
 builder.Services
     .AddMediatR(config =>
     {
+        // Register handlers from both API and Application assemblies
         config.RegisterServicesFromAssembly(typeof(Program).Assembly);
+        config.RegisterServicesFromAssembly(typeof(Reservation.Application.Abstractions.ICommandHandler<,>).Assembly);
         config.AddOpenBehavior(typeof(LoggingBehavior<,>));
         config.AddOpenBehavior(typeof(ValidationBehavior<,>));
     });
@@ -144,6 +151,17 @@ app.UseHttpsRedirection();
 // TODO: Add authentication and authorization middleware when implementing auth feature
 // app.UseAuthentication();
 // app.UseAuthorization();
+
+// Map all endpoint groups (Vertical Slice Architecture)
+var endpointGroups = typeof(Program).Assembly
+    .GetTypes()
+    .Where(t => t.IsAssignableTo(typeof(EndpointGroup)) && !t.IsAbstract);
+
+foreach (var endpointGroup in endpointGroups)
+{
+    var instance = Activator.CreateInstance(endpointGroup) as EndpointGroup;
+    instance?.Map(app);
+}
 
 // Migrate database on startup (development only)
 // NOTE: Database migration is optional - app can run without it

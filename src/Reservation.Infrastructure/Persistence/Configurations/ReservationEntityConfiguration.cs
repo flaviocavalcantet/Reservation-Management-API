@@ -31,15 +31,15 @@ public class ReservationEntityConfiguration : IEntityTypeConfiguration<Domain.Re
             .IsRequired()
             .HasColumnType("uuid");
 
-        // StartDate - required timestamp
+        // StartDate - required timestamp with time zone (to store UTC times)
         builder.Property(r => r.StartDate)
             .IsRequired()
-            .HasColumnType("timestamp without time zone");
+            .HasColumnType("timestamp with time zone");
 
-        // EndDate - required timestamp
+        // EndDate - required timestamp with time zone (to store UTC times)
         builder.Property(r => r.EndDate)
             .IsRequired()
-            .HasColumnType("timestamp without time zone");
+            .HasColumnType("timestamp with time zone");
 
         // Status - value object stored as string (status name)
         builder.Property(r => r.Status)
@@ -53,12 +53,10 @@ public class ReservationEntityConfiguration : IEntityTypeConfiguration<Domain.Re
         // Created and Modified timestamps (from AggregateRoot base)
         builder.Property(r => r.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamp without time zone")
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(r => r.ModifiedAt)
-            .HasColumnType("timestamp without time zone")
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            .HasColumnType("timestamp with time zone");
 
         // ============ INDEXES FOR QUERY OPTIMIZATION ============
         

@@ -81,8 +81,9 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
         catch (Exception ex)
         {
             // Unexpected error - log and return generic error message
+            var innerMessage = ex.InnerException?.Message ?? "";
             return ReservationDtoMapping.ToErrorResult(
-                $"An error occurred while creating the reservation: {ex.Message}");
+                $"An error occurred while creating the reservation: {ex.Message} {(string.IsNullOrEmpty(innerMessage) ? "" : $"Details: {innerMessage}")}");
         }
     }
 }
