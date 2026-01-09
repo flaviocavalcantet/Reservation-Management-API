@@ -65,11 +65,12 @@
      - `Reservation.Tests.csproj`
    - **Dependencies**: Domain, Application, xUnit, Moq, FluentAssertions
 
-### Documentation (7 files)
+### Documentation (8 files)
 
 | File | Purpose | Audience |
 |------|---------|----------|
 | [README.md](README.md) | Complete architecture guide with design patterns | All developers |
+| [API_ENDPOINTS.md](API_ENDPOINTS.md) | Complete REST API endpoint reference with examples | API consumers, frontend developers |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Architecture Decision Records (ADRs) with rationale | Architects, seniors |
 | [QUICKSTART.md](QUICKSTART.md) | Setup, database config, running the app | New developers |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Code style, patterns, testing guidelines | All developers |
@@ -375,8 +376,8 @@ public abstract class EndpointGroup
 | Metric | Value |
 |--------|-------|
 | **Projects** | 5 (Domain, Application, Infrastructure, API, Tests) |
-| **Total Files** | 31 |
-| **Documentation Files** | 7 comprehensive guides |
+| **Total Files** | 32 |
+| **Documentation Files** | 8 comprehensive guides |
 | **Base Classes** | 4 (Entity, AggregateRoot, ValueObject, DomainEvent) |
 | **Interfaces** | 6+ (IRepository, IUnitOfWork, ICommand, IQuery, handlers) |
 | **NuGet Packages** | 12+ configured |
@@ -461,7 +462,7 @@ public abstract class EndpointGroup
 - Database migration support
 
 ### Thoroughly Documented
-- 7 comprehensive documentation files
+- 8 comprehensive documentation files
 - 10 Architecture Decision Records
 - Code examples and patterns
 - Visual diagrams and flows
@@ -542,7 +543,8 @@ public abstract class EndpointGroup
 - ✅ Test project configured
 - ✅ PostgreSQL database configuration
 - ✅ Swagger/OpenAPI setup
-- ✅ 7 comprehensive documentation files
+- ✅ 8 comprehensive documentation files
+- ✅ API endpoint documentation complete
 - ✅ All code properly commented
 - ✅ Architecture decisions documented
 
@@ -558,11 +560,13 @@ For questions or clarifications:
 3. Follow [DEVELOPMENT.md](DEVELOPMENT.md) for patterns
 4. Reference [DIAGRAMS.md](DIAGRAMS.md) for visual flows
 5. See [QUICKSTART.md](QUICKSTART.md) for setup issues
+6. Use [API_ENDPOINTS.md](API_ENDPOINTS.md) for API reference
 
 ---
 
 **Project Setup**: ✅ Complete  
-**Date**: January 8, 2026  
+**API Documentation**: ✅ Complete  
+**Date**: January 9, 2026  
 **Version**: 1.0  
 **Status**: Production-Ready Foundation  
 **Next Phase**: Domain Aggregate Development

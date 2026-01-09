@@ -424,6 +424,19 @@ tests/Reservation.Tests/
    https://localhost:7071/swagger
    ```
 
+## API Endpoints
+
+For complete API endpoint documentation including request/response examples, error handling, and workflow examples, see [API_ENDPOINTS.md](API_ENDPOINTS.md).
+
+### Quick Endpoint Reference
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `POST` | `/api/v1/reservations` | Create a new reservation |
+| `POST` | `/api/v1/reservations/{id}/confirm` | Confirm a reservation |
+| `POST` | `/api/v1/reservations/{id}/cancel` | Cancel a reservation |
+| `GET` | `/api/v1/reservations?customerId={id}` | Get reservations by customer |
+
 ## Code Organization Patterns
 
 ### Feature-Based Organization
