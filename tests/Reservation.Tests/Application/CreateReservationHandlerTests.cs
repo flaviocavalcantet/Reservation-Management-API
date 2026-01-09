@@ -6,6 +6,7 @@ using Reservation.Application.Features.Reservations.CreateReservation;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
 using Reservation.Domain.Reservations;
+using Microsoft.Extensions.Logging;
 
 namespace Reservation.Tests.Application;
 
@@ -17,13 +18,15 @@ public class CreateReservationHandlerTests
 {
     private readonly Mock<IReservationRepository> _mockRepository;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    private readonly Mock<ILogger<CreateReservationHandler>> _mockLogger;
     private readonly CreateReservationHandler _handler;
 
     public CreateReservationHandlerTests()
     {
         _mockRepository = new Mock<IReservationRepository>();
         _mockUnitOfWork = new Mock<IUnitOfWork>();
-        _handler = new CreateReservationHandler(_mockRepository.Object, _mockUnitOfWork.Object);
+        _mockLogger = new Mock<ILogger<CreateReservationHandler>>();
+        _handler = new CreateReservationHandler(_mockRepository.Object, _mockUnitOfWork.Object, _mockLogger.Object);
     }
 
     [Fact]

@@ -17,6 +17,9 @@
     <!-- MediatR for CQRS pattern support -->
     <PackageReference Include="MediatR" Version="12.2.0" />
     <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
+    
+    <!-- Logging abstraction for dependency injection -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

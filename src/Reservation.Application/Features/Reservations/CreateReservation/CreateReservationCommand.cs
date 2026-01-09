@@ -2,6 +2,7 @@ using Reservation.Application.Abstractions;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
 using Reservation.Domain.Reservations;
+using Microsoft.Extensions.Logging;
 
 namespace Reservation.Application.Features.Reservations.CreateReservation;
 
@@ -39,19 +40,28 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
 {
     private readonly IReservationRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<CreateReservationHandler> _logger;
 
     public CreateReservationHandler(
         IReservationRepository repository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ILogger<CreateReservationHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<ReservationOperationResultDto> Handle(
         CreateReservationCommand command,
         CancellationToken cancellationToken)
     {
+        _logger.LogInformation(
+            "Creating reservation for customer {CustomerId} from {StartDate} to {EndDate}",
+            command.CustomerId,
+            command.StartDate,
+            command.EndDate);
+
         try
         {
             // 1. Create domain aggregate - this enforces business rules
@@ -61,6 +71,11 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
                 startDate: command.StartDate,
                 endDate: command.EndDate);
 
+            _logger.LogDebug(
+                "Reservation entity created with ID {ReservationId} in {Status} status",
+                reservation.Id,
+                reservation.Status);
+
             // 2. Persist the aggregate
             //    The repository saves the entity to the database
             await _repository.AddAsync(reservation, cancellationToken);
@@ -69,6 +84,11 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
             //    Unit of Work ensures atomic persistence
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+            _logger.LogInformation(
+                "Reservation {ReservationId} created and persisted successfully for customer {CustomerId}",
+                reservation.Id,
+                command.CustomerId);
+
             // 4. Return success DTO
             //    Domain events will be published by infrastructure layer after save
             return ReservationDtoMapping.ToSuccessResult(reservation);
@@ -76,12 +96,24 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
         catch (InvalidOperationException ex)
         {
             // Domain validation failed - return error to client
+            _logger.LogWarning(
+                ex,
+                "Domain validation failed for reservation creation. CustomerId: {CustomerId}. Error: {ErrorMessage}",
+                command.CustomerId,
+                ex.Message);
+
             return ReservationDtoMapping.ToErrorResult(ex.Message);
         }
         catch (Exception ex)
         {
             // Unexpected error - log and return generic error message
             var innerMessage = ex.InnerException?.Message ?? "";
+            _logger.LogError(
+                ex,
+                "Unexpected error occurred while creating reservation for customer {CustomerId}. Inner error: {InnerError}",
+                command.CustomerId,
+                innerMessage);
+
             return ReservationDtoMapping.ToErrorResult(
                 $"An error occurred while creating the reservation: {ex.Message} {(string.IsNullOrEmpty(innerMessage) ? "" : $"Details: {innerMessage}")}");
         }
