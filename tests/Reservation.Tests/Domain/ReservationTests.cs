@@ -2,6 +2,7 @@ using Xunit;
 using FluentAssertions;
 using ReservationEntity = Reservation.Domain.Reservations.Reservation;
 using Reservation.Domain.Reservations;
+using Reservation.Domain.Exceptions;
 
 namespace Reservation.Tests.Domain;
 
@@ -70,7 +71,7 @@ public class ReservationTests
         var action = () => ReservationEntity.Create(customerId, startDate, endDate);
 
         // Assert
-        action.Should().Throw<InvalidOperationException>()
+        action.Should().Throw<DomainValidationException>()
             .WithMessage("*end date*cannot be earlier than start date*");
     }
 
@@ -168,8 +169,8 @@ public class ReservationTests
         var action = () => reservation.Confirm();
 
         // Assert
-        action.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Cannot confirm*Confirmed*status*");
+        action.Should().Throw<InvalidAggregateStateException>()
+            .WithMessage("*Confirmed*");
     }
 
     [Fact]
@@ -186,8 +187,8 @@ public class ReservationTests
         var action = () => reservation.Confirm();
 
         // Assert
-        action.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Cannot confirm*Cancelled*status*");
+        action.Should().Throw<InvalidAggregateStateException>()
+            .WithMessage("*Cancelled*");
     }
 
     #endregion
@@ -244,8 +245,8 @@ public class ReservationTests
         var action = () => reservation.Cancel("Customer request");
 
         // Assert
-        action.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Cannot cancel a confirmed reservation after its start date*");
+        action.Should().Throw<BusinessRuleViolationException>()
+            .WithMessage("*Start date*");
     }
 
     [Fact]
@@ -262,8 +263,8 @@ public class ReservationTests
         var action = () => reservation.Cancel("Second cancellation");
 
         // Assert
-        action.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Cannot cancel a reservation that is already cancelled*");
+        action.Should().Throw<InvalidAggregateStateException>()
+            .WithMessage("*already cancelled*");
     }
 
     [Fact]

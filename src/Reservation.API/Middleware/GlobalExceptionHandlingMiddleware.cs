@@ -1,11 +1,21 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using FluentValidation;
+using Reservation.Domain.Exceptions;
+using Microsoft.Extensions.Logging;
 
 namespace Reservation.API.Middleware;
 
 /// <summary>
 /// Global exception handling middleware that captures unhandled exceptions,
 /// logs them with structured logging, and returns standardized error responses.
+/// 
+/// Pattern: Central exception handling with semantic mapping
+/// - Handles domain exceptions with business-aware responses
+/// - Maps validation errors to 400 Bad Request
+/// - Maps not found to 404
+/// - Maps conflicts to 409
+/// - Defaults to 500 for unexpected errors
 /// </summary>
 public class GlobalExceptionHandlingMiddleware
 {
@@ -56,30 +66,45 @@ public class GlobalExceptionHandlingMiddleware
     private void LogException(HttpContext context, Exception exception, string correlationId)
     {
         var severity = GetExceptionSeverity(exception);
+        var exceptionType = exception.GetType().Name;
 
-        if (severity == "critical" || severity == "error")
+        switch (severity)
         {
-            _logger.LogError(
-                exception,
-                "Unhandled exception ({ExceptionType}) in {Method} {Path}. " +
-                "CorrelationId: {CorrelationId}. RemoteIP: {RemoteIP}. Severity: {Severity}",
-                exception.GetType().Name,
-                context.Request.Method,
-                context.Request.Path,
-                correlationId,
-                context.Connection.RemoteIpAddress,
-                severity);
-        }
-        else
-        {
-            _logger.LogWarning(
-                exception,
-                "Validation exception in {Method} {Path}. " +
-                "CorrelationId: {CorrelationId}. RemoteIP: {RemoteIP}",
-                context.Request.Method,
-                context.Request.Path,
-                correlationId,
-                context.Connection.RemoteIpAddress);
+            case "critical":
+                _logger.LogCritical(
+                    exception,
+                    "Critical system error ({ExceptionType}) in {Method} {Path}. " +
+                    "CorrelationId: {CorrelationId}. RemoteIP: {RemoteIP}",
+                    exceptionType,
+                    context.Request.Method,
+                    context.Request.Path,
+                    correlationId,
+                    context.Connection.RemoteIpAddress);
+                break;
+
+            case "error":
+                _logger.LogError(
+                    exception,
+                    "Unhandled exception ({ExceptionType}) in {Method} {Path}. " +
+                    "CorrelationId: {CorrelationId}. RemoteIP: {RemoteIP}",
+                    exceptionType,
+                    context.Request.Method,
+                    context.Request.Path,
+                    correlationId,
+                    context.Connection.RemoteIpAddress);
+                break;
+
+            case "warning":
+            default:
+                _logger.LogWarning(
+                    exception,
+                    "Business rule violation ({ExceptionType}) in {Method} {Path}. " +
+                    "CorrelationId: {CorrelationId}",
+                    exceptionType,
+                    context.Request.Method,
+                    context.Request.Path,
+                    correlationId);
+                break;
         }
     }
 
@@ -109,16 +134,46 @@ public class GlobalExceptionHandlingMiddleware
             }
         };
 
-        // Add additional validation error details if applicable
-        if (exception is ValidationException validationEx)
-        {
-            errorResponse.Error.Details = new[] { validationEx.Message };
-        }
+        // Add additional details for specific exception types
+        AddExceptionDetails(exception, errorResponse.Error);
 
         var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
         var json = JsonSerializer.Serialize(errorResponse, options);
 
         return context.Response.WriteAsync(json);
+    }
+
+    /// <summary>
+    /// Adds exception-specific details to the error response.
+    /// </summary>
+    private static void AddExceptionDetails(Exception exception, ErrorDetail errorDetail)
+    {
+        switch (exception)
+        {
+            case FluentValidation.ValidationException validationEx:
+                errorDetail.Details = new[] { validationEx.Message };
+                break;
+
+            case InvalidAggregateStateException stateEx:
+                errorDetail.Details = new[]
+                {
+                    $"Current state: {stateEx.CurrentState}",
+                    $"Requested operation: {stateEx.RequestedOperation}"
+                };
+                break;
+
+            case DomainValidationException domainValidEx:
+                errorDetail.Details = domainValidEx.Errors;
+                break;
+
+            case BusinessRuleViolationException ruleEx:
+                errorDetail.Details = new[] { $"Rule: {ruleEx.RuleName}" };
+                break;
+
+            case AggregateNotFoundException notFoundEx:
+                errorDetail.Details = new[] { $"{notFoundEx.AggregateType} with ID '{notFoundEx.AggregateId}'" };
+                break;
+        }
     }
 
     /// <summary>
@@ -130,17 +185,26 @@ public class GlobalExceptionHandlingMiddleware
     {
         return exception switch
         {
-            ArgumentException => (StatusCode: 400, ErrorType: "ArgumentError", Message: "Invalid argument provided."),
-            ValidationException => (StatusCode: 400, ErrorType: "ValidationError", Message: "Validation failed."),
-            InvalidOperationException => (StatusCode: 409, ErrorType: "ConflictError", Message: "Operation cannot be performed in current state."),
-            KeyNotFoundException => (StatusCode: 404, ErrorType: "NotFoundError", Message: "Requested resource not found."),
-            UnauthorizedAccessException => (StatusCode: 401, ErrorType: "UnauthorizedError", Message: "Authentication is required."),
-            _ => (StatusCode: 500, ErrorType: "InternalServerError", Message: "An unexpected error occurred. Please try again later.")
+            // Domain exceptions - client errors (4xx)
+            DomainValidationException => (400, "ValidationError", "One or more validation errors occurred."),
+            InvalidAggregateStateException => (409, "ConflictError", "The operation cannot be performed in the current state."),
+            AggregateNotFoundException => (404, "NotFoundError", "The requested resource was not found."),
+            AggregateConflictException => (409, "ConflictError", "The resource conflicts with an existing resource."),
+            BusinessRuleViolationException => (422, "UnprocessableEntity", "The request violates business rules."),
+
+            // Framework exceptions
+            FluentValidation.ValidationException => (400, "ValidationError", "Request validation failed."),
+            ArgumentException => (400, "ArgumentError", "Invalid argument provided."),
+            KeyNotFoundException => (404, "NotFoundError", "Requested resource not found."),
+            UnauthorizedAccessException => (401, "UnauthorizedError", "Authentication is required."),
+
+            // Default
+            _ => (500, "InternalServerError", "An unexpected error occurred. Please try again later.")
         };
     }
 
     /// <summary>
-    /// Determines the severity level of an exception.
+    /// Determines the severity level of an exception for logging purposes.
     /// </summary>
     /// <param name="exception">The exception to evaluate.</param>
     /// <returns>A severity level as string: "critical", "error", or "warning".</returns>
@@ -148,8 +212,19 @@ public class GlobalExceptionHandlingMiddleware
     {
         return exception switch
         {
-            ValidationException => "warning",
-            ArgumentException => "warning",
+            // Domain business rule violations - expected, log as warning
+            BusinessRuleViolationException or
+            InvalidAggregateStateException or
+            DomainValidationException or
+            AggregateNotFoundException => "warning",
+
+            // Validation errors - expected, log as warning
+            FluentValidation.ValidationException or ArgumentException => "warning",
+
+            // Infrastructure/system errors - unexpected
+            DomainException => "error",
+
+            // Everything else - unexpected error
             _ => "error"
         };
     }

@@ -1,6 +1,7 @@
 using Reservation.Application.Abstractions;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
+using Reservation.Domain.Exceptions;
 using Reservation.Domain.Reservations;
 using Microsoft.Extensions.Logging;
 
@@ -65,7 +66,7 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
         try
         {
             // 1. Create domain aggregate - this enforces business rules
-            //    If dates are invalid, an exception is thrown by the domain
+            //    If dates are invalid, a domain exception is thrown
             var reservation = Domain.Reservations.Reservation.Create(
                 customerId: command.CustomerId,
                 startDate: command.StartDate,
@@ -77,45 +78,62 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
                 reservation.Status);
 
             // 2. Persist the aggregate
-            //    The repository saves the entity to the database
             await _repository.AddAsync(reservation, cancellationToken);
             
             // 3. Commit transaction
-            //    Unit of Work ensures atomic persistence
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Reservation {ReservationId} created and persisted successfully for customer {CustomerId}",
+                "Reservation {ReservationId} created successfully for customer {CustomerId}",
                 reservation.Id,
                 command.CustomerId);
 
             // 4. Return success DTO
-            //    Domain events will be published by infrastructure layer after save
             return ReservationDtoMapping.ToSuccessResult(reservation);
         }
-        catch (InvalidOperationException ex)
+        catch (DomainValidationException ex)
         {
-            // Domain validation failed - return error to client
             _logger.LogWarning(
-                ex,
-                "Domain validation failed for reservation creation. CustomerId: {CustomerId}. Error: {ErrorMessage}",
+                "Validation failed while creating reservation for customer {CustomerId}. " +
+                "Property: {PropertyName}. Errors: {Errors}",
                 command.CustomerId,
+                ex.PropertyName,
+                string.Join("; ", ex.Errors));
+
+            return ReservationDtoMapping.ToErrorResult(ex.Message);
+        }
+        catch (BusinessRuleViolationException ex)
+        {
+            _logger.LogWarning(
+                "Business rule violation when creating reservation for customer {CustomerId}. " +
+                "Rule: {RuleName}. Message: {Message}",
+                command.CustomerId,
+                ex.RuleName,
+                ex.Message);
+
+            return ReservationDtoMapping.ToErrorResult(ex.Message);
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Domain error while creating reservation for customer {CustomerId}. " +
+                "Error code: {ErrorCode}. Message: {Message}",
+                command.CustomerId,
+                ex.ErrorCode,
                 ex.Message);
 
             return ReservationDtoMapping.ToErrorResult(ex.Message);
         }
         catch (Exception ex)
         {
-            // Unexpected error - log and return generic error message
-            var innerMessage = ex.InnerException?.Message ?? "";
             _logger.LogError(
                 ex,
-                "Unexpected error occurred while creating reservation for customer {CustomerId}. Inner error: {InnerError}",
-                command.CustomerId,
-                innerMessage);
+                "Unexpected error occurred while creating reservation for customer {CustomerId}",
+                command.CustomerId);
 
             return ReservationDtoMapping.ToErrorResult(
-                $"An error occurred while creating the reservation: {ex.Message} {(string.IsNullOrEmpty(innerMessage) ? "" : $"Details: {innerMessage}")}");
+                "An unexpected error occurred while creating the reservation.");
         }
     }
 }

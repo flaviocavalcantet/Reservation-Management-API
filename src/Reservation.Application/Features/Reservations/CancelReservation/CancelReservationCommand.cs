@@ -1,6 +1,7 @@
 using Reservation.Application.Abstractions;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
+using Reservation.Domain.Exceptions;
 using Reservation.Domain.Reservations;
 using Microsoft.Extensions.Logging;
 
@@ -66,42 +67,64 @@ public class CancelReservationHandler : ICommandHandler<CancelReservationCommand
             if (reservation is null)
             {
                 _logger.LogWarning(
-                    "Reservation {ReservationId} not found for cancellation",
+                    "Attempted to cancel non-existent reservation {ReservationId}",
                     command.ReservationId);
 
-                return ReservationDtoMapping.ToErrorResult(
-                    $"Reservation with ID {command.ReservationId} not found.");
+                throw new AggregateNotFoundException(nameof(Reservation), command.ReservationId);
             }
 
             _logger.LogDebug(
-                "Loaded reservation {ReservationId} with current status {Status} for cancellation",
+                "Loaded reservation {ReservationId} with status {Status} for cancellation",
                 reservation.Id,
                 reservation.Status);
 
-            // 2. Apply business operation
-            //    Domain enforces: can only cancel before start date if confirmed
-            //    If cancellation is invalid, domain throws InvalidOperationException
-            reservation.Cancel();
+            // 2. Apply cancellation business operation
+            reservation.Cancel(command.Reason);
 
             // 3. Persist changes
             await _repository.UpdateAsync(reservation, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Reservation {ReservationId} cancelled successfully",
-                command.ReservationId);
+                "Reservation {ReservationId} cancelled successfully. Reason: {Reason}",
+                command.ReservationId,
+                command.Reason);
 
             // 4. Return success DTO
             return ReservationDtoMapping.ToSuccessResult(reservation);
         }
-        catch (InvalidOperationException ex)
+        catch (AggregateNotFoundException ex)
         {
-            // Domain business rule violation (e.g., trying to cancel after start date)
+            _logger.LogWarning(ex.Message);
+            return ReservationDtoMapping.ToErrorResult(ex.Message);
+        }
+        catch (InvalidAggregateStateException ex)
+        {
             _logger.LogWarning(
-                ex,
-                "Business rule violation when cancelling reservation {ReservationId}: {ErrorMessage}",
+                "Cannot cancel reservation {ReservationId} - invalid state. " +
+                "Current state: {CurrentState}",
                 command.ReservationId,
-                ex.Message);
+                ex.CurrentState);
+
+            return ReservationDtoMapping.ToErrorResult(ex.Message);
+        }
+        catch (BusinessRuleViolationException ex)
+        {
+            _logger.LogWarning(
+                "Business rule violation when cancelling reservation {ReservationId}. " +
+                "Rule: {RuleName}",
+                command.ReservationId,
+                ex.RuleName);
+
+            return ReservationDtoMapping.ToErrorResult(ex.Message);
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Domain error when cancelling reservation {ReservationId}. Error code: {ErrorCode}",
+                command.ReservationId,
+                ex.ErrorCode);
 
             return ReservationDtoMapping.ToErrorResult(ex.Message);
         }
@@ -113,7 +136,7 @@ public class CancelReservationHandler : ICommandHandler<CancelReservationCommand
                 command.ReservationId);
 
             return ReservationDtoMapping.ToErrorResult(
-                $"An error occurred while cancelling the reservation: {ex.Message}");
+                "An unexpected error occurred while cancelling the reservation.");
         }
     }
 }

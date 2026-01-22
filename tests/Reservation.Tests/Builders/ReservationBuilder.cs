@@ -90,8 +90,11 @@ public class ReservationBuilder
     /// </summary>
     public ReservationEntity BuildConfirmedPastStartDate()
     {
+        // Use 1 second ago for start and 1 second from now for end
+        // This ensures start is past but end is still future
+        var now = DateTime.UtcNow;
         var reservation = new ReservationBuilder()
-            .WithRelativeDates(-2, -1) // -2 to -1 days (in the past)
+            .WithDates(now.AddSeconds(-1), now.AddSeconds(1))
             .Build();
         
         reservation.Confirm();

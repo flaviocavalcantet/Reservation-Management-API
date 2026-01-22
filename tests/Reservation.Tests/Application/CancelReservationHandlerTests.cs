@@ -84,7 +84,7 @@ public class CancelReservationHandlerTests
 
         // Assert
         result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("already cancelled");
+        result.ErrorMessage.Should().Contain("Cancelled");
     }
 
     [Fact]
@@ -102,6 +102,6 @@ public class CancelReservationHandlerTests
 
         // Assert
         result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("after its start date");
+        result.ErrorMessage.Should().Contain("start date");
     }
 }

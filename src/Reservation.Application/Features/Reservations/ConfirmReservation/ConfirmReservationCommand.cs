@@ -1,6 +1,7 @@
 using Reservation.Application.Abstractions;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
+using Reservation.Domain.Exceptions;
 using Reservation.Domain.Reservations;
 using Microsoft.Extensions.Logging;
 
@@ -58,20 +59,18 @@ public class ConfirmReservationHandler : ICommandHandler<ConfirmReservationComma
             if (reservation is null)
             {
                 _logger.LogWarning(
-                    "Reservation {ReservationId} not found for confirmation",
+                    "Attempted to confirm non-existent reservation {ReservationId}",
                     command.ReservationId);
 
-                return ReservationDtoMapping.ToErrorResult(
-                    $"Reservation with ID {command.ReservationId} not found.");
+                throw new AggregateNotFoundException(nameof(Reservation), command.ReservationId);
             }
 
             _logger.LogDebug(
-                "Loaded reservation {ReservationId} with current status {Status}",
+                "Loaded reservation {ReservationId} with status {Status}",
                 reservation.Id,
                 reservation.Status);
 
             // 2. Apply business operation (enforces transition rules in domain)
-            //    If status transition is invalid, domain throws InvalidOperationException
             reservation.Confirm();
 
             // 3. Persist changes
@@ -82,17 +81,31 @@ public class ConfirmReservationHandler : ICommandHandler<ConfirmReservationComma
                 "Reservation {ReservationId} confirmed successfully",
                 command.ReservationId);
 
-            // 4. Return success DTO with updated status
+            // 4. Return success DTO
             return ReservationDtoMapping.ToSuccessResult(reservation);
         }
-        catch (InvalidOperationException ex)
+        catch (AggregateNotFoundException ex)
         {
-            // Domain business rule violation
+            _logger.LogWarning(ex.Message);
+            return ReservationDtoMapping.ToErrorResult(ex.Message);
+        }
+        catch (InvalidAggregateStateException ex)
+        {
             _logger.LogWarning(
-                ex,
-                "Business rule violation when confirming reservation {ReservationId}: {ErrorMessage}",
+                "Cannot confirm reservation {ReservationId} - invalid state transition. " +
+                "Current state: {CurrentState}",
                 command.ReservationId,
-                ex.Message);
+                ex.CurrentState);
+
+            return ReservationDtoMapping.ToErrorResult(ex.Message);
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Domain error when confirming reservation {ReservationId}. Error code: {ErrorCode}",
+                command.ReservationId,
+                ex.ErrorCode);
 
             return ReservationDtoMapping.ToErrorResult(ex.Message);
         }
@@ -104,7 +117,7 @@ public class ConfirmReservationHandler : ICommandHandler<ConfirmReservationComma
                 command.ReservationId);
 
             return ReservationDtoMapping.ToErrorResult(
-                $"An error occurred while confirming the reservation: {ex.Message}");
+                "An unexpected error occurred while confirming the reservation.");
         }
     }
 }

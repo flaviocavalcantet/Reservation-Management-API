@@ -1,4 +1,5 @@
 using Reservation.Domain.Abstractions;
+using Reservation.Domain.Exceptions;
 
 namespace Reservation.Domain.Reservations;
 
@@ -39,6 +40,21 @@ public class Reservation : AggregateRoot
     /// </summary>
     public ReservationStatus Status { get; private set; }
 
+    /// <summary>
+    /// When the reservation was confirmed (null if not confirmed)
+    /// </summary>
+    public DateTime? ConfirmedAt { get; private set; }
+
+    /// <summary>
+    /// When the reservation was cancelled (null if not cancelled)
+    /// </summary>
+    public DateTime? CancelledAt { get; private set; }
+
+    /// <summary>
+    /// Reason for cancellation (if provided)
+    /// </summary>
+    public string? CancellationReason { get; private set; }
+
     // Private constructor - use factory methods for creation
     private Reservation() { }
 
@@ -64,12 +80,27 @@ public class Reservation : AggregateRoot
         // Business Rule: EndDate must be >= StartDate
         if (endDate < startDate)
         {
-            throw new InvalidOperationException(
-                $"Reservation end date ({endDate:O}) cannot be earlier than start date ({startDate:O})");
+            throw new DomainValidationException(
+                nameof(EndDate),
+                $"End date ({endDate:O}) cannot be earlier than start date ({startDate:O})");
         }
 
-        // Business Rule: Dates must be in the future (optional - adjust based on requirements)
-        // For now, we allow past dates for testing purposes
+        // Business Rule: Customer ID must be valid
+        if (customerId == Guid.Empty)
+        {
+            throw new DomainValidationException(
+                nameof(CustomerId),
+                "Customer ID must not be empty");
+        }
+
+        // Business Rule: Dates must not be in the past
+        var now = DateTime.UtcNow;
+        if (endDate <= now)
+        {
+            throw new BusinessRuleViolationException(
+                "ReservationDateRule",
+                $"Reservation end date must be in the future. Provided: {endDate:O}, Current: {now:O}");
+        }
 
         var reservation = new Reservation
         {
@@ -109,11 +140,14 @@ public class Reservation : AggregateRoot
         // Enforce business rule: only created reservations can be confirmed
         if (!Status.CanBeConfirmed)
         {
-            throw new InvalidOperationException(
-                $"Cannot confirm reservation in '{Status}' status. Only 'Created' reservations can be confirmed.");
+            throw new InvalidAggregateStateException(
+                Status.Value,
+                nameof(Confirm),
+                "Only reservations in 'Created' status can be confirmed.");
         }
 
         Status = ReservationStatus.Confirmed;
+        ConfirmedAt = DateTime.UtcNow;
         ModifiedAt = DateTime.UtcNow;
 
         // Emit event so subscribers can process confirmation (send email, block calendar, etc.)
@@ -134,19 +168,24 @@ public class Reservation : AggregateRoot
         // Enforce business rule: cannot cancel already-cancelled reservations
         if (!Status.CanBeCancelled)
         {
-            throw new InvalidOperationException(
-                $"Cannot cancel a reservation that is already cancelled.");
+            throw new InvalidAggregateStateException(
+                Status.Value,
+                nameof(Cancel),
+                "Already cancelled reservations cannot be cancelled again.");
         }
 
         // Enforce business rule: confirmed reservations cannot be cancelled after start date
         if (Status == ReservationStatus.Confirmed && DateTime.UtcNow >= StartDate)
         {
-            throw new InvalidOperationException(
-                $"Cannot cancel a confirmed reservation after its start date ({StartDate:O}). " +
-                "Current time: {DateTime.UtcNow:O}");
+            throw new BusinessRuleViolationException(
+                "ConfirmedReservationCancellationRule",
+                $"Confirmed reservations cannot be cancelled after their start date. " +
+                $"Start date: {StartDate:O}, Current time: {DateTime.UtcNow:O}");
         }
 
         Status = ReservationStatus.Cancelled;
+        CancelledAt = DateTime.UtcNow;
+        CancellationReason = reason;
         ModifiedAt = DateTime.UtcNow;
 
         // Emit event so subscribers can process cancellation (refund, send notification, etc.)
