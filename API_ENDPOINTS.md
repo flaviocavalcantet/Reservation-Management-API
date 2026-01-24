@@ -5,7 +5,7 @@ Complete reference guide for all REST API endpoints in the Reservation Managemen
 **API Version**: v1  
 **Base URL**: `/api/v1`  
 **Content-Type**: `application/json`  
-**Authentication**: Not implemented (open API)
+**Authentication**: JWT Bearer Token (see [AUTHENTICATION.md](AUTHENTICATION.md))
 
 ---
 
@@ -13,22 +13,388 @@ Complete reference guide for all REST API endpoints in the Reservation Managemen
 
 The Reservation Management API provides endpoints for creating, managing, and querying reservations. The API follows RESTful principles and uses HTTP status codes to indicate operation success or failure.
 
+The API also includes health check endpoints for monitoring application status and readiness.
+
 ### Quick Reference Table
 
-| Method | Endpoint | Description | Status Code |
-|--------|----------|-------------|-------------|
-| `POST` | `/reservations` | Create a new reservation | 201 Created |
-| `POST` | `/reservations/{id}/confirm` | Confirm a reservation | 200 OK |
-| `POST` | `/reservations/{id}/cancel` | Cancel a reservation | 200 OK |
-| `GET` | `/reservations?customerId={id}` | Get reservations by customer | 200 OK |
+| Method | Endpoint | Auth | Description | Status Code |
+|--------|----------|------|-------------|-------------|
+| `GET` | `/health/live` | No | Liveness check - is application running | 200 OK |
+| `GET` | `/health/ready` | No | Readiness check - is application ready for traffic | 200 OK |
+| `GET` | `/health/detailed` | No | Detailed health status with all dependencies | 200 OK |
+| `POST` | `/auth/login` | No | Login with email/password | 200 OK |
+| `POST` | `/auth/register` | No | Register new user | 201 Created |
+| `POST` | `/reservations` | Yes | Create a new reservation | 201 Created |
+| `POST` | `/reservations/{id}/confirm` | Yes | Confirm a reservation | 200 OK |
+| `POST` | `/reservations/{id}/cancel` | Yes | Cancel a reservation | 200 OK |
+| `GET` | `/reservations?customerId={id}` | Yes | Get reservations by customer | 200 OK |
 
 ---
 
-## Endpoints
+## Health Check Endpoints
 
-### 1. Create Reservation
+### 1. Liveness Check
+
+**Endpoint**: `GET /health/live`
+
+Indicates if the application process is running. Used by orchestration platforms (Kubernetes, Docker) to determine if the container should be restarted.
+
+#### Request
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**: Empty (GET request, no body)
+
+#### Response
+
+**Success (200 OK)**:
+```json
+{
+  "status": "alive",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "uptime": 512
+}
+```
+
+**Service Unavailable (503 Service Unavailable)**:
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "uptime": 512
+}
+```
+
+#### Business Rules
+
+- Always returns 200 if the application process is running
+- No dependencies are checked
+- Responds quickly (< 100ms)
+- Can be called frequently without performance impact
+
+#### Example cURL
+
+```bash
+curl -X GET https://localhost:7071/health/live \
+  -H "Content-Type: application/json"
+```
+
+---
+
+### 2. Readiness Check
+
+**Endpoint**: `GET /health/ready`
+
+Indicates if the application is ready to accept traffic. Used by load balancers to route traffic to this instance.
+
+#### Request
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**: Empty (GET request, no body)
+
+#### Response
+
+**Success (200 OK)**:
+```json
+{
+  "status": "ready",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "dependencies": ["self"]
+}
+```
+
+**Not Ready (503 Service Unavailable)**:
+```json
+{
+  "status": "notready",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "dependencies": []
+}
+```
+
+#### Business Rules
+
+- Returns 200 when application startup is complete
+- Checks all critical startup dependencies
+- Used by load balancers for traffic routing decisions
+- Endpoint should return 503 during application startup/shutdown
+
+#### Example cURL
+
+```bash
+curl -X GET https://localhost:7071/health/ready \
+  -H "Content-Type: application/json"
+```
+
+---
+
+### 3. Detailed Health
+
+**Endpoint**: `GET /health/detailed`
+
+Returns comprehensive health information including all dependencies, runtime environment, and component statuses. Useful for monitoring dashboards and diagnostics.
+
+#### Request
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**: Empty (GET request, no body)
+
+#### Response
+
+**Success (200 OK)**:
+```json
+{
+  "status": "Healthy",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "runtime": {
+    "dotNetVersion": ".NET 8.0.0",
+    "osDescription": "Windows 10 (build 19045)",
+    "processorCount": 8
+  },
+  "components": {
+    "database": {
+      "status": "Healthy",
+      "description": "Database connection is healthy",
+      "duration": 45.23
+    },
+    "cache": {
+      "status": "Healthy",
+      "description": "Cache service is healthy",
+      "duration": 12.15
+    }
+  }
+}
+```
+
+**Partially Degraded (503 Service Unavailable)**:
+```json
+{
+  "status": "Degraded",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "runtime": {
+    "dotNetVersion": ".NET 8.0.0",
+    "osDescription": "Windows 10 (build 19045)",
+    "processorCount": 8
+  },
+  "components": {
+    "database": {
+      "status": "Healthy",
+      "description": "Database connection is healthy",
+      "duration": 45.23
+    },
+    "cache": {
+      "status": "Unhealthy",
+      "description": "Cache service unavailable",
+      "duration": 5000.00
+    }
+  }
+}
+```
+
+#### Response Fields
+
+**Top Level**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Overall health status: "Healthy", "Degraded", or "Unhealthy" |
+| `timestamp` | DateTime (ISO 8601) | When the health check was performed |
+| `runtime` | RuntimeInfo | Runtime environment information |
+| `components` | object | Health status of individual components |
+
+**Runtime Info**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dotNetVersion` | string | .NET runtime version |
+| `osDescription` | string | Operating system information |
+| `processorCount` | int | Number of processors available |
+
+**Component Health**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Component status: "Healthy", "Degraded", or "Unhealthy" |
+| `description` | string | Human-readable description of component status |
+| `duration` | number | Time taken for health check in milliseconds |
+
+#### Health Status Values
+
+| Status | Meaning | HTTP Code | Action |
+|--------|---------|-----------|--------|
+| `Healthy` | All components operational | 200 | Accept traffic normally |
+| `Degraded` | Some components unhealthy but critical ones functional | 503 | Accept traffic with caution |
+| `Unhealthy` | Critical components down | 503 | Do not route traffic |
+
+#### Example cURL
+
+```bash
+curl -X GET https://localhost:7071/health/detailed \
+  -H "Content-Type: application/json"
+```
+
+---
+
+## Authentication Endpoints
+
+### 1. Login
+
+**Endpoint**: `POST /api/v1/auth/login`
+
+Authenticates a user and returns a JWT access token.
+
+#### Request
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Parameters**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------| 
+| `email` | string | Yes | User email address. Must be a valid email format. |
+| `password` | string | Yes | User password. Minimum 6 characters. |
+
+#### Response
+
+**Success (200 OK)**:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 900,
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "roles": ["User"]
+}
+```
+
+**Invalid Credentials (401 Unauthorized)**:
+```json
+{
+  "message": "Invalid email or password"
+}
+```
+
+#### Business Rules
+
+- Email must be a valid email format
+- Password must be at least 6 characters
+- Email and password are case-sensitive
+- Invalid email/password returns 401 (generic message for security)
+
+#### Example cURL
+
+```bash
+curl -X POST https://localhost:7071/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePassword123!"
+  }'
+```
+
+---
+
+### 2. Register
+
+**Endpoint**: `POST /api/v1/auth/register`
+
+Creates a new user account and returns a JWT access token.
+
+#### Request
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "fullName": "John Doe",
+  "email": "john@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Parameters**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `fullName` | string | Yes | User's full name. 2-200 characters. |
+| `email` | string | Yes | User email address. Must be unique and valid format. |
+| `password` | string | Yes | User password. Minimum 6 characters. |
+
+#### Response
+
+**Success (201 Created)**:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 900,
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "john@example.com",
+  "roles": ["User"]
+}
+```
+
+**Email Already Exists (409 Conflict)**:
+```json
+{
+  "message": "User with this email already exists"
+}
+```
+
+#### Business Rules
+
+- Email must be unique (409 if already registered)
+- Email must be valid format
+- Full name must be 2-200 characters
+- Password must be at least 6 characters
+- New users automatically get "User" role
+
+#### Example cURL
+
+```bash
+curl -X POST https://localhost:7071/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fullName": "John Doe",
+    "email": "john@example.com",
+    "password": "SecurePassword123!"
+  }'
+```
+
+---
+
+## Reservation Endpoints
+
+### 3. Create Reservation
 
 **Endpoint**: `POST /api/v1/reservations`
+
+**Authentication**: Required (Bearer token)
 
 Creates a new reservation for a customer. The reservation is initially created in "Created" status and must be confirmed before it becomes active.
 
@@ -37,6 +403,7 @@ Creates a new reservation for a customer. The reservation is initially created i
 **Headers**:
 ```
 Content-Type: application/json
+Authorization: Bearer {accessToken}
 ```
 
 **Body**:
@@ -102,6 +469,7 @@ Content-Type: application/json
 ```bash
 curl -X POST https://localhost:7071/api/v1/reservations \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
   -d '{
     "customerId": "550e8400-e29b-41d4-a716-446655440000",
     "startDate": "2026-02-15T14:00:00Z",
@@ -119,9 +487,11 @@ curl -X POST https://localhost:7071/api/v1/reservations \
 
 ---
 
-### 2. Confirm Reservation
+### 4. Confirm Reservation
 
 **Endpoint**: `POST /api/v1/reservations/{id}/confirm`
+
+**Authentication**: Required (Bearer token)
 
 Transitions a reservation from "Created" status to "Confirmed" status. Only reservations in "Created" status can be confirmed.
 
@@ -136,6 +506,7 @@ Transitions a reservation from "Created" status to "Confirmed" status. Only rese
 **Headers**:
 ```
 Content-Type: application/json
+Authorization: Bearer {accessToken}
 ```
 
 **Body**: Empty (no request body required)
@@ -184,7 +555,8 @@ Content-Type: application/json
 
 ```bash
 curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-557766551111/confirm \
-  -H "Content-Type: application/json"
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
 ```
 
 #### HTTP Status Codes
@@ -198,9 +570,11 @@ curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-
 
 ---
 
-### 3. Cancel Reservation
+### 5. Cancel Reservation
 
 **Endpoint**: `POST /api/v1/reservations/{id}/cancel`
+
+**Authentication**: Required (Bearer token)
 
 Cancels an existing reservation with optional cancellation reason. Business rules apply based on reservation status and dates.
 
@@ -276,6 +650,7 @@ Content-Type: application/json
 # With reason
 curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-557766551111/cancel \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
   -d '{
     "reason": "Guest requested cancellation"
   }'
@@ -283,6 +658,7 @@ curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-
 # Without reason
 curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-557766551111/cancel \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
   -d '{}'
 ```
 
@@ -297,9 +673,11 @@ curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-
 
 ---
 
-### 4. Get Reservations by Customer
+### 6. Get Reservations by Customer
 
 **Endpoint**: `GET /api/v1/reservations?customerId={customerId}`
+
+**Authentication**: Required (Bearer token)
 
 Retrieves all reservations (created, confirmed, and cancelled) for a specific customer. Results are ordered by start date in descending order (newest first).
 
@@ -314,6 +692,7 @@ Retrieves all reservations (created, confirmed, and cancelled) for a specific cu
 **Headers**:
 ```
 Content-Type: application/json
+Authorization: Bearer {accessToken}
 ```
 
 **Body**: Empty (GET request, no body)
@@ -381,7 +760,8 @@ Each reservation object contains:
 
 ```bash
 curl -X GET "https://localhost:7071/api/v1/reservations?customerId=550e8400-e29b-41d4-a716-446655440000" \
-  -H "Content-Type: application/json"
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
 ```
 
 #### HTTP Status Codes
@@ -613,11 +993,29 @@ The current API version is **v1**, indicated by the `/api/v1` prefix in all endp
 
 ---
 
+## Authentication Details
+
+For complete authentication setup, configuration, and security practices, see [AUTHENTICATION.md](AUTHENTICATION.md).
+
+### Token Usage
+
+After obtaining an access token from `/auth/login` or `/auth/register`, include it in all protected endpoint requests:
+
+```
+Authorization: Bearer {accessToken}
+```
+
+**Token Expiration**: 900 seconds (15 minutes)  
+**Token Type**: JWT with HS256 signature  
+
+---
+
 ## Documentation Updates
 
-This documentation was last updated: **January 9, 2026**
+This documentation was last updated: **January 24, 2026**
 
 For the latest code implementation, see:
+- [AuthenticationEndpoints.cs](src/Reservation.API/Endpoints/AuthenticationEndpoints.cs)
 - [ReservationEndpoints.cs](src/Reservation.API/Endpoints/ReservationEndpoints.cs)
 - [Program.cs](src/Reservation.API/Program.cs)
 - [DTOs](src/Reservation.API/DTOs/)
@@ -625,4 +1023,5 @@ For the latest code implementation, see:
 For architecture details, see:
 - [README.md](README.md)
 - [ARCHITECTURE.md](ARCHITECTURE.md)
-- [DEVELOPMENT.md](DEVELOPMENT.md)
+- [AUTHENTICATION.md](AUTHENTICATION.md)
+- [INDEX.md](INDEX.md) - Complete documentation guide

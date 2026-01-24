@@ -2,6 +2,8 @@
 
 A production-ready REST API for managing reservations built with **.NET 8, ASP.NET Core, and Clean Architecture**.
 
+> **📚 Documentation**: See [INDEX.md](INDEX.md) for complete documentation guide and quick navigation.
+
 ## Architecture Overview
 
 This solution implements **Clean Architecture** with **Tactical Domain-Driven Design (DDD)** principles, ensuring separation of concerns, high testability, and maintainability.

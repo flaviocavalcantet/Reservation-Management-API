@@ -7,7 +7,7 @@ Comprehensive automated tests have been added to the Reservation Management proj
 **Framework**: xUnit 2.6.6  
 **Mocking Library**: Moq 4.20.70  
 **Assertions Library**: FluentAssertions 6.12.0  
-**Total Tests**: 36  
+**Total Tests**: 67  
 **Status**: ✅ All Passing
 
 ---
@@ -78,7 +78,40 @@ Application layer tests use **Moq** to mock repository and unit of work dependen
 
 ---
 
-### 3. Test Utilities (Builders & Factories)
+### 3. Authentication & Authorization Tests (27 tests)
+**File**: `tests/Reservation.Tests/Application/Authentication/AuthenticationTests.cs`
+
+Comprehensive tests for user authentication, credential validation, and role-based access control.
+
+#### Email Validation (7 tests)
+- ✅ Valid formats: standard, with subdomains, plus-addressing
+- ✅ Invalid formats: missing @, missing domain, missing local part, empty
+
+#### Password Validation (6 tests)
+- ✅ Strong passwords accepted
+- ✅ Weak passwords rejected (too short, empty)
+- ✅ Minimum length requirement enforced (6+ characters)
+
+#### Credential Validation (8 tests)
+- ✅ Login requires both email and password
+- ✅ Login rejects empty/invalid email
+- ✅ Login rejects weak passwords
+- ✅ Registration requires full name, email, password
+- ✅ Invalid credentials fail login
+- ✅ Non-existent users fail login
+
+#### Role-Based Access Control (6 tests)
+- ✅ Admin access enforcement
+- ✅ User/Manager role restrictions
+- ✅ Case-sensitive role comparison
+- ✅ Multiple roles support
+- ✅ Role detection with various combinations
+
+**Key Feature**: All tests use pure unit test patterns - no database, no infrastructure dependencies.
+
+---
+
+### 4. Test Utilities (Builders & Factories)
 **File**: [Reservation.Tests.Builders.ReservationBuilder](tests/Reservation.Tests/Builders/ReservationBuilder.cs)
 
 Fluent builder pattern for test data generation:
@@ -184,7 +217,10 @@ All critical business rules are tested with both success and failure cases:
 | Command Handlers (Create) | 5 | Success/error paths, mocking |
 | Command Handlers (Confirm) | 4 | Success/error paths, not found |
 | Command Handlers (Cancel) | 5 | Success/error paths, time checks |
-| **Total** | **36** | **Comprehensive** |
+| Authentication (Email/Password) | 13 | Validation rules, format checks |
+| Authorization (RBAC) | 6 | Role enforcement, access control |
+| Credential Validation | 8 | Login/register validation |
+| **Total** | **67** | **Comprehensive** |
 
 ---
 

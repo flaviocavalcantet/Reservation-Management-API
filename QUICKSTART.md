@@ -137,7 +137,9 @@ Dependency flow: `API → Application → Domain` and `Infrastructure → Domain
 
 - **Full Architecture**: See [README.md](README.md)
 - **Decision Records**: See [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Authentication & Authorization**: See [AUTHENTICATION.md](AUTHENTICATION.md)
 - **API Documentation**: Available at `/swagger` when app is running
+- **Documentation Index**: See [INDEX.md](INDEX.md) for complete guide
 
 ## Support
 
