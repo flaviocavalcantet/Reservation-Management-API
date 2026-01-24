@@ -18,12 +18,16 @@
     </PackageReference>
     <PackageReference Include="Moq" Version="4.20.70" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Test project references Domain and Application for testing -->
     <ProjectReference Include="../../src/Reservation.Domain/Reservation.Domain.csproj" />
     <ProjectReference Include="../../src/Reservation.Application/Reservation.Application.csproj" />
+    <ProjectReference Include="../../src/Reservation.API/Reservation.API.csproj" />
+    <ProjectReference Include="../../src/Reservation.Infrastructure/Reservation.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
