@@ -1,4 +1,4 @@
-using Reservation.Infrastructure.Identity;
+using Reservation.Application.Authentication;
 
 namespace Reservation.Application.Repositories;
 
@@ -29,7 +29,7 @@ public interface IIdentityUserRepository
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Result indicating success/failure.</returns>
     Task<IdentityUserResult> CreateUserAsync(
-        ApplicationUser user,
+        IApplicationUser user,
         string password,
         CancellationToken cancellationToken = default);
 
@@ -39,7 +39,7 @@ public interface IIdentityUserRepository
     /// <param name="email">Email to search for.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>ApplicationUser if found, null otherwise.</returns>
-    Task<ApplicationUser?> GetByEmailAsync(
+    Task<IApplicationUser?> GetByEmailAsync(
         string email,
         CancellationToken cancellationToken = default);
 
@@ -49,7 +49,7 @@ public interface IIdentityUserRepository
     /// <param name="userId">GUID of user to find.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>ApplicationUser if found, null otherwise.</returns>
-    Task<ApplicationUser?> GetByIdAsync(
+    Task<IApplicationUser?> GetByIdAsync(
         Guid userId,
         CancellationToken cancellationToken = default);
 
@@ -103,7 +103,7 @@ public interface IIdentityUserRepository
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if password is correct, false otherwise.</returns>
     Task<bool> VerifyPasswordAsync(
-        ApplicationUser user,
+        IApplicationUser user,
         string password,
         CancellationToken cancellationToken = default);
 }

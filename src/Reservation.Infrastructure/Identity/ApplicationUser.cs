@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Reservation.Application.Authentication;
 
 namespace Reservation.Infrastructure.Identity;
 
@@ -8,6 +9,7 @@ namespace Reservation.Infrastructure.Identity;
 /// 
 /// Design Notes:
 /// - Extends IdentityUser{Guid} for GUID-based user IDs
+/// - Implements IApplicationUser for abstraction across layers
 /// - Contains only Identity-related concerns (not domain logic)
 /// - Maps to AspNetUsers and related Identity tables
 /// - Password hashing handled automatically by Identity
@@ -15,7 +17,7 @@ namespace Reservation.Infrastructure.Identity;
 /// 
 /// This class lives in Infrastructure layer to keep Identity decoupled from Domain.
 /// </summary>
-public class ApplicationUser : IdentityUser<Guid>
+public class ApplicationUser : IdentityUser<Guid>, IApplicationUser
 {
     /// <summary>
     /// Full name of the user for display purposes.
@@ -45,4 +47,11 @@ public class ApplicationUser : IdentityUser<Guid>
     /// Set when user account is deactivated or deleted.
     /// </summary>
     public DateTime? DeactivatedAtUtc { get; set; }
+
+    /// <summary>
+    /// User's assigned roles.
+    /// Note: In Identity-based implementation, roles are stored in AspNetUserRoles table.
+    /// This property is populated manually when needed (not automatically loaded from DB).
+    /// </summary>
+    public IList<string> Roles { get; set; } = new List<string>();
 }

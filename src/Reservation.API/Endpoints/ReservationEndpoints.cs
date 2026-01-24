@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using MediatR;
 using Reservation.API.DTOs;
 using Reservation.Application.Features.Reservations.CancelReservation;
@@ -26,7 +27,8 @@ public class ReservationEndpoints : EndpointGroup
         var group = app.MapGroup("/api/v1/reservations")
             .WithName("Reservations")
             .WithOpenApi()
-            .WithTags("Reservations");
+            .WithTags("Reservations")
+            .RequireAuthorization();  // All reservation endpoints require JWT authentication
 
         // Endpoints
         group.MapCreateReservation();

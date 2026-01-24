@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
+using Reservation.Application.Authentication;
 using Reservation.Application.Repositories;
+using Reservation.Infrastructure.Authentication;
 using Reservation.Infrastructure.Identity;
 
 namespace Reservation.Infrastructure.Repositories;
@@ -42,15 +44,21 @@ public class IdentityUserRepository : IIdentityUserRepository
     /// The password is automatically hashed by UserManager using PBKDF2.
     /// </summary>
     public async Task<IdentityUserResult> CreateUserAsync(
-        ApplicationUser user,
+        IApplicationUser user,
         string password,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNullOrWhiteSpace(password);
 
+        // Cast to ApplicationUser (concrete type) for UserManager
+        if (user is not ApplicationUser appUser)
+        {
+            return IdentityUserResult.Failure("User must be an ApplicationUser instance");
+        }
+
         // CreateAsync handles password hashing internally
-        var result = await _userManager.CreateAsync(user, password);
+        var result = await _userManager.CreateAsync(appUser, password);
 
         if (!result.Succeeded)
         {
@@ -66,24 +74,26 @@ public class IdentityUserRepository : IIdentityUserRepository
     /// <summary>
     /// Finds a user by email address (case-insensitive).
     /// </summary>
-    public async Task<ApplicationUser?> GetByEmailAsync(
+    public async Task<IApplicationUser?> GetByEmailAsync(
         string email,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNullOrWhiteSpace(email);
 
         // UserManager.FindByEmailAsync is case-insensitive
-        return await _userManager.FindByEmailAsync(email);
+        var user = await _userManager.FindByEmailAsync(email);
+        return user?.ToApplicationUser();
     }
 
     /// <summary>
     /// Finds a user by ID.
     /// </summary>
-    public async Task<ApplicationUser?> GetByIdAsync(
+    public async Task<IApplicationUser?> GetByIdAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        return await _userManager.FindByIdAsync(userId.ToString());
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        return user?.ToApplicationUser();
     }
 
     /// <summary>
@@ -106,7 +116,7 @@ public class IdentityUserRepository : IIdentityUserRepository
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetByIdAsync(userId, cancellationToken);
+        var user = await GetByIdAsync(userId, cancellationToken) as ApplicationUser;
         if (user == null)
         {
             return IdentityUserResult.Failure("User not found");
@@ -137,7 +147,7 @@ public class IdentityUserRepository : IIdentityUserRepository
     {
         ArgumentNullException.ThrowIfNullOrWhiteSpace(roleName);
 
-        var user = await GetByIdAsync(userId, cancellationToken);
+        var user = await GetByIdAsync(userId, cancellationToken) as ApplicationUser;
         if (user == null)
         {
             return IdentityUserResult.Failure("User not found");
@@ -163,7 +173,7 @@ public class IdentityUserRepository : IIdentityUserRepository
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetByIdAsync(userId, cancellationToken);
+        var user = await GetByIdAsync(userId, cancellationToken) as ApplicationUser;
         if (user == null)
         {
             return new List<string>();
@@ -177,14 +187,20 @@ public class IdentityUserRepository : IIdentityUserRepository
     /// Verifies a user's password using constant-time comparison.
     /// </summary>
     public async Task<bool> VerifyPasswordAsync(
-        ApplicationUser user,
+        IApplicationUser user,
         string password,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNullOrWhiteSpace(password);
 
+        // Cast to ApplicationUser (concrete type) for UserManager
+        if (user is not ApplicationUser appUser)
+        {
+            return false;
+        }
+
         // CheckPasswordAsync uses constant-time comparison to prevent timing attacks
-        return await _userManager.CheckPasswordAsync(user, password);
+        return await _userManager.CheckPasswordAsync(appUser, password);
     }
 }

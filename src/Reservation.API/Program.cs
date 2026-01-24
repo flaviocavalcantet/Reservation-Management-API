@@ -4,10 +4,13 @@ using FluentValidation;
 using Reservation.Application.Behaviors;
 using Reservation.Infrastructure;
 using Reservation.Infrastructure.Persistence;
+using Reservation.Infrastructure.Identity;
+using Reservation.Infrastructure.Authentication;
 using Reservation.API.Endpoints;
 using Reservation.API.Middleware;
 using Serilog;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 // ============= STRUCTURED LOGGING CONFIGURATION =============
 // Configure Serilog before building the application
@@ -48,6 +51,23 @@ try
             config.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
 
+    // ============= JWT AUTHENTICATION CONFIGURATION =============
+    // Load and validate JWT settings before service registration
+    var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>()
+        ?? throw new InvalidOperationException(
+            "JwtSettings section not found in configuration. " +
+            "Add JwtSettings to appsettings.json with SecretKey, Issuer, and Audience.");
+
+    try
+    {
+        jwtSettings.Validate();  // Validates secret key length, issuer, audience, etc.
+    }
+    catch (InvalidOperationException ex)
+    {
+        Log.Fatal(ex, "JWT settings validation failed");
+        throw;
+    }
+
     // Add Health Checks - REQUIRED for /health/detailed endpoint
     builder.Services.AddHealthChecks()
         .AddCheck("self", () => HealthCheckResult.Healthy("Application is running"))
@@ -69,6 +89,14 @@ try
                     errorCodesToAdd: null);
             }
         }));
+
+    // ============= IDENTITY CONFIGURATION =============
+    // Register ASP.NET Core Identity services for user management
+    builder.Services.AddIdentityServices(builder.Configuration, connectionString);
+
+    // ============= JWT BEARER AUTHENTICATION =============
+    // Register JWT token service and configure Bearer scheme
+    builder.Services.AddAuthenticationServices(builder.Configuration, jwtSettings);
 
     // Register infrastructure services
     builder.Services.AddInfrastructure();
@@ -184,9 +212,11 @@ try
 
     app.UseHttpsRedirection();
 
-    // TODO: Add authentication and authorization middleware when implementing auth feature
-    // app.UseAuthentication();
-    // app.UseAuthorization();
+    // ============= AUTHENTICATION & AUTHORIZATION MIDDLEWARE =============
+    // CRITICAL: UseAuthentication MUST come before UseAuthorization
+    // Authentication extracts JWT claims, Authorization checks permissions
+    app.UseAuthentication();    // Validate JWT Bearer tokens
+    app.UseAuthorization();     // Check role-based permissions
 
     // Map all endpoint groups (Vertical Slice Architecture)
     var endpointGroups = typeof(Program).Assembly

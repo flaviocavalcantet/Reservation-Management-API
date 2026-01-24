@@ -29,4 +29,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- JWT Bearer authentication -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.0" />
+  </ItemGroup>
+
 </Project>
