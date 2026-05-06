@@ -71,6 +71,7 @@ public sealed class ReservationCreatedIntegrationEvent : IntegrationEvent
     public DateTime EndDateUtc { get; }
     public DateTime CreatedAtUtc { get; }
     public override string Topic => "reservations.created";
+    public override string Key => ReservationId.ToString();
 }
 ```
 

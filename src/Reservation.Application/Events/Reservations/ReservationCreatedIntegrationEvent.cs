@@ -60,4 +60,9 @@ public sealed class ReservationCreatedIntegrationEvent : IntegrationEvent
     /// Gets the topic this event should be published to
     /// </summary>
     public override string Topic => "reservations.created";
+
+    /// <summary> Gets the message key for partitioning in Kafka
+    /// Using ReservationId ensures all events for the same reservation go to the same partition, preserving order
+    /// </summary>
+    public override string Key => ReservationId.ToString();
 }

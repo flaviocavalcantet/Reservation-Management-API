@@ -65,4 +65,9 @@ public abstract class IntegrationEvent
     /// Override in derived classes to customize routing
     /// </summary>
     public virtual string Topic => "events";
+
+    /// <summary> Gets the message key for partitioning in Kafka
+    /// Default is EventId, but can be overridden for different partitioning strategies
+    /// </summary>
+    public virtual string Key => EventId.ToString();
 }

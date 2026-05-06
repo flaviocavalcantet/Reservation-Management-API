@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Reservation.Application.Events;
 using Reservation.Domain.Abstractions;
 using System.Text.Json;
+using System.Text;
 
 namespace Reservation.Infrastructure.Messaging;
 
@@ -40,13 +41,15 @@ public class KafkaEventPublisher : IEventPublisher
     /// </summary>
     public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : class
     {
-        if (@event is null)
+        var integrationEvent = @event as IntegrationEvent;
+        if (integrationEvent is null)
         {
             throw new ArgumentNullException(nameof(@event));
         }
 
         try
         {
+
             // Serialize event to JSON
             var json = JsonSerializer.Serialize(@event, new JsonSerializerOptions
             {
@@ -58,6 +61,7 @@ public class KafkaEventPublisher : IEventPublisher
             // Determine topic and key based on event type
             var (topic, key) = GetTopicAndKey(@event);
 
+
             // Create Kafka message with event ID as key (ensures ordering per partition)
             var message = new Message<string, string>
             {
@@ -65,7 +69,9 @@ public class KafkaEventPublisher : IEventPublisher
                 Value = json,
                 Headers = new Headers
                 {
-                    { "event-type", System.Text.Encoding.UTF8.GetBytes(@event.GetType().Name) },
+                    { "event-type", Encoding.UTF8.GetBytes(integrationEvent.EventType) },
+                    { "event-id", Encoding.UTF8.GetBytes(integrationEvent.EventId.ToString()) },
+                    { "correlation-id", Encoding.UTF8.GetBytes(integrationEvent.CorrelationId.ToString()) },
                     { "timestamp", System.Text.Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O")) }
                 }
             };
@@ -132,6 +138,24 @@ public class KafkaEventPublisher : IEventPublisher
         _logger.LogInformation(
             "Batch publishing completed. EventCount: {EventCount}",
             eventList.Count);
+    }
+
+    /// <summary>
+    /// Gets the topic and key for a given event.
+    /// </summary> <param name="event">The event to determine topic and key for.</param>
+    private static (string Topic, string Key) GetTopicAndKey<TEvent>(TEvent @event)
+    {
+        return @event switch
+        {
+            IntegrationEvent integrationEvent
+                => (integrationEvent.Topic, integrationEvent.Key),
+
+            DomainEvent domainEvent
+                => GetTopicAndKey(ConvertToIntegrationEvent(domainEvent)),
+
+            _ => throw new NotSupportedException(
+                $"Event type '{@event!.GetType().Name}' is not supported for Kafka publishing.")
+        };
     }
 
     /// <summary>
