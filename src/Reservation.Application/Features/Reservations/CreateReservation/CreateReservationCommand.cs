@@ -1,5 +1,7 @@
 using Reservation.Application.Abstractions;
 using Reservation.Application.DTOs;
+using Reservation.Application.Events;
+using Reservation.Application.Events.Reservations;
 using Reservation.Domain.Abstractions;
 using Reservation.Domain.Exceptions;
 using Reservation.Domain.Reservations;
@@ -41,15 +43,18 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
 {
     private readonly IReservationRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<CreateReservationHandler> _logger;
 
     public CreateReservationHandler(
         IReservationRepository repository,
         IUnitOfWork unitOfWork,
+        IEventPublisher eventPublisher,
         ILogger<CreateReservationHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
         _logger = logger;
     }
 
@@ -88,7 +93,21 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
                 reservation.Id,
                 command.CustomerId);
 
-            // 4. Return success DTO
+            // 4. Publish integration event (after successful persistence)
+            var integrationEvent = new ReservationCreatedIntegrationEvent(
+                reservationId: reservation.Id,
+                customerId: reservation.CustomerId,
+                startDateUtc: reservation.StartDate,
+                endDateUtc: reservation.EndDate,
+                createdAtUtc: reservation.CreatedAt);
+
+            await _eventPublisher.PublishAsync(integrationEvent, cancellationToken);
+
+            _logger.LogDebug(
+                "ReservationCreated event published for reservation {ReservationId}",
+                reservation.Id);
+
+            // 5. Return success DTO
             return ReservationDtoMapping.ToSuccessResult(reservation);
         }
         catch (DomainValidationException ex)

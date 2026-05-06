@@ -12,6 +12,7 @@ Quick reference guide to Reservation Management API documentation.
 3. **[AUTHENTICATION.md](AUTHENTICATION.md)** - JWT authentication, authorization, and RBAC configuration
 4. **[ARCHITECTURE.md](ARCHITECTURE.md)** - Clean Architecture principles and design patterns
 5. **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Development workflow and best practices
+6. **[EVENT_DRIVEN_ARCHITECTURE.md](EVENT_DRIVEN_ARCHITECTURE.md)** - Kafka event-driven messaging and integration events
 
 ## Reference
 
@@ -29,6 +30,7 @@ Quick reference guide to Reservation Management API documentation.
 | AUTHENTICATION.md | Security implementation | Developers, DevOps |
 | ARCHITECTURE.md | Design patterns & principles | Architects, Senior Developers |
 | DEVELOPER_GUIDE.md | How to write code | Developers |
+| EVENT_DRIVEN_ARCHITECTURE.md | Kafka & event-driven messaging | Architects, Backend Developers |
 | API_ENDPOINTS.md | API reference | Frontend Developers, API Consumers |
 | TESTING.md | Test coverage & patterns | QA, Developers |
 | OBSERVABILITY.md | Logs & monitoring | DevOps, SRE |
@@ -46,6 +48,9 @@ Quick reference guide to Reservation Management API documentation.
 
 **...implement authentication/authorization**
 → [AUTHENTICATION.md](AUTHENTICATION.md)
+
+**...implement event-driven messaging with Kafka**
+→ [EVENT_DRIVEN_ARCHITECTURE.md](EVENT_DRIVEN_ARCHITECTURE.md)
 
 **...see available API endpoints**
 → [API_ENDPOINTS.md](API_ENDPOINTS.md)
