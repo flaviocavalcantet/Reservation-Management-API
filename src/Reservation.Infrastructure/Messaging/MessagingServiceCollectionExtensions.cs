@@ -66,17 +66,15 @@ public static class MessagingServiceCollectionExtensions
                 BootstrapServers = kafkaSettings.BootstrapServers,
                 ClientId = "reservation-api-producer",
                 Acks = Enum.Parse<Confluent.Kafka.Acks>(kafkaSettings.Acks),
-                Retries = kafkaSettings.Retries,
+                MessageSendMaxRetries  = kafkaSettings.Retries,
                 RetryBackoffMs = kafkaSettings.RetryBackoffMs,
                 RequestTimeoutMs = kafkaSettings.RequestTimeoutMs,
-                MessageFormatVersion = kafkaSettings.MessageFormatVersion,
                 CompressionType = Enum.Parse<Confluent.Kafka.CompressionType>(kafkaSettings.CompressionType),
-                MaxInFlightRequests = kafkaSettings.MaxInFlightRequests,
+                MaxInFlight = kafkaSettings.MaxInFlightRequests,
                 EnableIdempotence = kafkaSettings.EnableIdempotence,
                 TransactionalId = kafkaSettings.TransactionalId,
                 BatchSize = kafkaSettings.BatchSize,
                 LingerMs = kafkaSettings.LingerMs,
-                BufferMemory = kafkaSettings.BufferMemory,
             };
 
             // Configure SASL if enabled
