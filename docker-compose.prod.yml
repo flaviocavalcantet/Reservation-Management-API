@@ -1,12 +1,10 @@
-version: '3.8'
-
 # Production configuration - override for production deployments
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
 
 services:
   postgres:
     environment:
-      POSTGRES_PASSWORD: "${DB_PASSWORD:?Database password must be set}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Database password must be set}"
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
