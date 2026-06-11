@@ -388,9 +388,54 @@ curl -X POST https://localhost:7071/api/v1/auth/register \
 
 ---
 
+### 3. Get Current User
+
+**Endpoint**: `GET /api/v1/auth/me`
+
+**Authentication**: Required (Bearer token - either the custom JWT or an Auth0 OIDC access token)
+
+Returns identity claims for the currently authenticated user. Useful for a frontend to verify a token is valid immediately after login and to read the user's roles.
+
+#### Request
+
+**Headers**:
+```
+Authorization: Bearer {accessToken}
+```
+
+#### Response
+
+**Success (200 OK)**:
+```json
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "roles": ["User"],
+  "issuer": "ReservationAPI"
+}
+```
+
+**Unauthenticated (401 Unauthorized)**: empty body.
+
+#### Notes
+
+- `userId` is the token's `sub` claim - a GUID for the custom JWT scheme, or the Auth0 user/client identifier (e.g. `auth0|...`) for Auth0 tokens.
+- `email` is `null` for Auth0 tokens unless added to the access token via a custom claim.
+- `roles` is empty for Auth0 tokens unless `Auth0Settings:RoleClaimType` has been configured via an Auth0 Action (see [AUTHENTICATION.md](AUTHENTICATION.md#mapping-auth0-roles-to-existing-rbac)).
+- `issuer` is the token's `iss` claim - `ReservationAPI` for the custom JWT scheme, or the Auth0 tenant URL for Auth0 tokens.
+
+#### Example cURL
+
+```bash
+curl -X GET https://localhost:7071/api/v1/auth/me \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+---
+
 ## Reservation Endpoints
 
-### 3. Create Reservation
+### 4. Create Reservation
 
 **Endpoint**: `POST /api/v1/reservations`
 
@@ -487,7 +532,7 @@ curl -X POST https://localhost:7071/api/v1/reservations \
 
 ---
 
-### 4. Confirm Reservation
+### 5. Confirm Reservation
 
 **Endpoint**: `POST /api/v1/reservations/{id}/confirm`
 
@@ -570,7 +615,7 @@ curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-
 
 ---
 
-### 5. Cancel Reservation
+### 6. Cancel Reservation
 
 **Endpoint**: `POST /api/v1/reservations/{id}/cancel`
 
@@ -673,7 +718,7 @@ curl -X POST https://localhost:7071/api/v1/reservations/660f9511-f40c-52e5-b827-
 
 ---
 
-### 6. Get Reservations by Customer
+### 7. Get Reservations by Customer
 
 **Endpoint**: `GET /api/v1/reservations?customerId={customerId}`
 

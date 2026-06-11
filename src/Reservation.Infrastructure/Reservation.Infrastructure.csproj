@@ -35,4 +35,9 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Redis distributed caching -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.0" />
+  </ItemGroup>
+
 </Project>

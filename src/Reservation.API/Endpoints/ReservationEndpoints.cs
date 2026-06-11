@@ -21,6 +21,10 @@ namespace Reservation.API.Endpoints;
 /// </summary>
 public class ReservationEndpoints : EndpointGroup
 {
+    /// <summary>
+    /// Maps reservation-related endpoints to the application.
+    /// </summary>
+    /// <param name="app"></param>
     public override void Map(WebApplication app)
     {
         // Create a route group for API v1 reservations endpoints

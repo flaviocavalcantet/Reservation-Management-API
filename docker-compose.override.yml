@@ -1,18 +1,13 @@
-version: '3.8'
-
 # Override configuration for development environment
 # This file is automatically loaded after docker-compose.yml by Docker Compose
 
 services:
   postgres:
-    environment:
-      POSTGRES_PASSWORD: postgres  # Use simple password for development
     ports:
       - "5432:5432"
 
   reservation-api:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      JwtSettings__SecretKey: "dev-secret-key-not-for-production-use-only-for-testing"
     ports:
       - "8080:8080"

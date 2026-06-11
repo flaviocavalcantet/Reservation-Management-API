@@ -2,6 +2,7 @@ using Xunit;
 using Moq;
 using FluentAssertions;
 using ReservationEntity = Reservation.Domain.Reservations.Reservation;
+using Reservation.Application.Caching;
 using Reservation.Application.Features.Reservations.CreateReservation;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
@@ -18,6 +19,7 @@ public class CreateReservationHandlerTests
 {
     private readonly Mock<IReservationRepository> _mockRepository;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    private readonly Mock<ICacheInvalidationStrategy> _mockCacheInvalidation;
     private readonly Mock<ILogger<CreateReservationHandler>> _mockLogger;
     private readonly CreateReservationHandler _handler;
 
@@ -25,8 +27,9 @@ public class CreateReservationHandlerTests
     {
         _mockRepository = new Mock<IReservationRepository>();
         _mockUnitOfWork = new Mock<IUnitOfWork>();
+        _mockCacheInvalidation = new Mock<ICacheInvalidationStrategy>();
         _mockLogger = new Mock<ILogger<CreateReservationHandler>>();
-        _handler = new CreateReservationHandler(_mockRepository.Object, _mockUnitOfWork.Object, _mockLogger.Object);
+        _handler = new CreateReservationHandler(_mockRepository.Object, _mockUnitOfWork.Object, _mockCacheInvalidation.Object, _mockLogger.Object);
     }
 
     [Fact]

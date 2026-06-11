@@ -285,39 +285,36 @@ builder.Services.AddInfrastructure(connectionString);
 | **All** | .NET 8 | Runtime |
 | **API** | ASP.NET Core 8 | Web framework |
 | **API** | Swagger/OpenAPI | API documentation |
+| **API** | Serilog | Structured logging |
 | **Application** | MediatR | CQRS pattern, pipeline behaviors |
 | **Infrastructure** | EF Core 8 | ORM |
 | **Infrastructure** | Npgsql | PostgreSQL driver |
+| **Infrastructure** | Redis (StackExchange.Redis) | Distributed caching |
+| **Infrastructure** | JWT Bearer + Auth0 (OIDC) | Authentication |
 | **Tests** | xUnit | Test framework |
 | **Tests** | Moq | Mocking |
 | **Tests** | FluentAssertions | Assertions |
+| **Ops** | Docker / Docker Compose | Containerized local environment |
+
+## Implemented Cross-Cutting Concerns
+
+### Authentication & Authorization
+The API supports two JWT Bearer schemes side by side:
+- A custom JWT scheme issued by `/api/v1/auth` endpoints (username/password)
+- An optional Auth0 (OIDC) scheme for third-party identity providers (e.g. Google login)
+
+`/api/v1/auth/me` returns the authenticated user's claims regardless of which scheme issued the token.
+See [AUTHENTICATION.md](AUTHENTICATION.md) for configuration and RBAC details.
+
+### Distributed Caching
+Reservation reads use a cache-aside pattern backed by Redis (`ICacheService`), with cache invalidation
+cascades (`ICacheInvalidationStrategy`) triggered on create/confirm/cancel. The cache fails open: if Redis
+is unreachable, requests fall back to the database instead of failing.
+See [CACHING_STRATEGY.md](CACHING_STRATEGY.md) for cache keys, TTLs, and invalidation rules.
 
 ## Future Evolution Support
 
 This architecture is designed for future extensibility:
-
-### Authentication & Authorization
-```csharp
-// Add to pipeline behaviors
-config.AddOpenBehavior(typeof(AuthorizationBehavior<,>));
-
-// Inject ICurrentUser into handlers
-public class CreateReservationHandler
-{
-    private readonly ICurrentUser _currentUser;
-    // Validates authorization in command handler
-}
-```
-
-### Caching
-```csharp
-// Add caching behavior
-config.AddOpenBehavior(typeof(CachingBehavior<,>));
-
-// Decorate queries with cache policy
-[Cacheable(Duration = 300)]
-public class GetReservationQuery : IQuery<ReservationDto> { }
-```
 
 ### Messaging (RabbitMQ, Azure Service Bus)
 ```csharp
@@ -391,7 +388,10 @@ tests/Reservation.Tests/
 ### Prerequisites
 - .NET 8 SDK or later
 - PostgreSQL 12 or later
+- Redis 7 or later (or run via Docker Compose)
 - Visual Studio 2022 or VS Code with C# extension
+
+> **🐳 Docker**: `docker compose up` starts the API, PostgreSQL, and Redis together. See [DOCKER_SETUP.md](DOCKER_SETUP.md).
 
 ### Setup
 
@@ -438,6 +438,7 @@ For complete API endpoint documentation including request/response examples, err
 | `POST` | `/api/v1/reservations/{id}/confirm` | Confirm a reservation |
 | `POST` | `/api/v1/reservations/{id}/cancel` | Cancel a reservation |
 | `GET` | `/api/v1/reservations?customerId={id}` | Get reservations by customer |
+| `GET` | `/api/v1/auth/me` | Get claims for the authenticated user (JWT or Auth0) |
 
 ## Code Organization Patterns
 
@@ -558,6 +559,6 @@ This codebase follows these principles:
 
 ---
 
-**Build date**: 2026-01-08  
+**Build date**: 2026-06-11  
 **Architecture Version**: 1.0  
 **Target Framework**: .NET 8

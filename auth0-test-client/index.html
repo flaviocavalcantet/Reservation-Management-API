@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reservation API - Auth0 Login Test</title>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    button { padding: 0.5rem 1rem; margin-right: 0.5rem; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.5; }
+    pre { background: #111; color: #0f0; padding: 1rem; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+    label { display: block; margin-top: 0.75rem; font-size: 0.9rem; }
+    input { width: 100%; padding: 0.4rem; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <h1>Reservation API - Auth0 Login Test</h1>
+  <p>Minimal SPA login harness using the Auth0 SPA SDK (PKCE). No build step required.</p>
+
+  <label>Auth0 Domain <input id="cfg-domain" value="dev-6n0y886wtzvqqq43.us.auth0.com" /></label>
+  <label>Auth0 Client ID (SPA) <input id="cfg-client-id" value="zijTFb1UoyXpH6Tgc6bj1Wz1f6q79aql" /></label>
+  <label>Audience <input id="cfg-audience" value="https://reservation-api/" /></label>
+  <label>API Base URL <input id="cfg-api-base" value="http://localhost:5080" /></label>
+
+  <div style="margin-top: 1rem;">
+    <button id="btn-login">Log In with Auth0</button>
+    <button id="btn-logout" disabled>Log Out</button>
+    <button id="btn-me" disabled>Call GET /api/v1/auth/me</button>
+  </div>
+
+  <pre id="output">Ready. Click "Log In with Auth0" to start.</pre>
+
+  <script>
+    let auth0Client;
+
+    const outputEl = document.getElementById("output");
+    const log = (label, data) => {
+      const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      outputEl.textContent += `\n=== ${label} ===\n${text}\n`;
+      outputEl.scrollTop = outputEl.scrollHeight;
+    };
+
+    const cfg = () => ({
+      domain: document.getElementById("cfg-domain").value.trim(),
+      clientId: document.getElementById("cfg-client-id").value.trim(),
+      audience: document.getElementById("cfg-audience").value.trim(),
+      apiBase: document.getElementById("cfg-api-base").value.trim()
+    });
+
+    async function configureClient() {
+      const { domain, clientId, audience } = cfg();
+      auth0Client = await auth0.createAuth0Client({
+        domain,
+        clientId,
+        authorizationParams: {
+          redirect_uri: window.location.origin,
+          audience,
+          scope: "openid profile email"
+        }
+      });
+    }
+
+    async function updateUI() {
+      const isAuthenticated = await auth0Client.isAuthenticated();
+      document.getElementById("btn-login").disabled = isAuthenticated;
+      document.getElementById("btn-logout").disabled = !isAuthenticated;
+      document.getElementById("btn-me").disabled = !isAuthenticated;
+
+      if (isAuthenticated) {
+        const user = await auth0Client.getUser();
+        log("Logged in as", user);
+      }
+    }
+
+    window.onload = async () => {
+      await configureClient();
+
+      const query = window.location.search;
+      if (query.includes("code=") && query.includes("state=")) {
+        try {
+          await auth0Client.handleRedirectCallback();
+          log("Redirect callback", "handled successfully");
+        } catch (err) {
+          log("Redirect callback error", err.message || String(err));
+        }
+        window.history.replaceState({}, document.title, "/");
+      }
+
+      await updateUI();
+
+      document.getElementById("btn-login").addEventListener("click", () => {
+        auth0Client.loginWithRedirect();
+      });
+
+      document.getElementById("btn-logout").addEventListener("click", () => {
+        auth0Client.logout({ logoutParams: { returnTo: window.location.origin } });
+      });
+
+      document.getElementById("btn-me").addEventListener("click", async () => {
+        try {
+          const token = await auth0Client.getTokenSilently();
+          log("Access token (truncated)", token.substring(0, 40) + "...");
+
+          const { apiBase } = cfg();
+          const res = await fetch(`${apiBase}/api/v1/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const body = await res.json().catch(() => null);
+          log(`GET /api/v1/auth/me -> HTTP ${res.status}`, body);
+        } catch (err) {
+          log("Error calling /api/v1/auth/me", err.message || String(err));
+        }
+      });
+    };
+  </script>
+</body>
+</html>

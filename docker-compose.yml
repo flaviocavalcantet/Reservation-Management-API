@@ -1,14 +1,12 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
     container_name: reservation-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ReservationManagement
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ReservationManagement}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
     ports:
       - "5432:5432"
@@ -16,6 +14,23 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reservation_network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: reservation-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,15 +47,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=ReservationManagement;Username=postgres;Password=postgres"
-      JwtSettings__SecretKey: "${JWT_SECRET_KEY:-your-secret-key-change-in-production}"
-      JwtSettings__Issuer: "ReservationAPI"
-      JwtSettings__Audience: "ReservationWebApp"
-      JwtSettings__AccessTokenExpirationMinutes: "15"
-      JwtSettings__RefreshTokenExpirationDays: "7"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-ReservationManagement};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      ConnectionStrings__Redis: "redis:6379"
+      JwtSettings__SecretKey: "${JWT_SECRET_KEY:-QD+ZwS/Xd/+BsLAngdV6rHG80bIw8B/sOdvB0cNSJ1A=}" # Example secret key, should be overridden in production with a secure value
+      JwtSettings__Issuer: "${JWT_ISSUER:-ReservationAPI}"
+      JwtSettings__Audience: "${JWT_AUDIENCE:-ReservationWebApp}"
+      JwtSettings__AccessTokenExpirationMinutes: "${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:-15}"
+      JwtSettings__RefreshTokenExpirationDays: "${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:-7}"
+      Auth0Settings__Authority: "${AUTH0_AUTHORITY:-}"
+      Auth0Settings__Audience: "${AUTH0_AUDIENCE:-}"
     ports:
       - "8080:8080"
     volumes:
@@ -59,6 +79,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:

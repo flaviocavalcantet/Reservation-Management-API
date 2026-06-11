@@ -6,6 +6,7 @@ using Reservation.Infrastructure;
 using Reservation.Infrastructure.Persistence;
 using Reservation.Infrastructure.Identity;
 using Reservation.Infrastructure.Authentication;
+using Reservation.Infrastructure.Caching;
 using Reservation.API.Endpoints;
 using Reservation.API.Middleware;
 using Serilog;
@@ -68,6 +69,25 @@ try
         throw;
     }
 
+    // ============= AUTH0 (OIDC) SETTINGS =============
+    // Optional: only validated/registered when Auth0Settings.Authority is configured.
+    var auth0Settings = builder.Configuration.GetSection("Auth0Settings").Get<Auth0Settings>()
+        ?? new Auth0Settings();
+
+    try
+    {
+        auth0Settings.Validate();
+        if (auth0Settings.IsConfigured)
+        {
+            Log.Information("Auth0 OIDC authentication enabled for authority {Authority}", auth0Settings.Authority);
+        }
+    }
+    catch (InvalidOperationException ex)
+    {
+        Log.Fatal(ex, "Auth0 settings validation failed");
+        throw;
+    }
+
     // Add Health Checks - REQUIRED for /health/detailed endpoint
     builder.Services.AddHealthChecks()
         .AddCheck("self", () => HealthCheckResult.Healthy("Application is running"))
@@ -95,11 +115,16 @@ try
     builder.Services.AddIdentityServices(builder.Configuration, connectionString);
 
     // ============= JWT BEARER AUTHENTICATION =============
-    // Register JWT token service and configure Bearer scheme
-    builder.Services.AddAuthenticationServices(builder.Configuration, jwtSettings);
+    // Register JWT token service and configure Bearer scheme(s) - custom JWT,
+    // and (if configured) a second "Auth0" scheme for OIDC access tokens.
+    builder.Services.AddAuthenticationServices(builder.Configuration, jwtSettings, auth0Settings);
 
     // Register infrastructure services
     builder.Services.AddInfrastructure();
+
+    // ============= DISTRIBUTED CACHING (REDIS) =============
+    // Registers ICacheService and ICacheInvalidationStrategy backed by Redis.
+    builder.Services.AddCachingServices(builder.Configuration);
 
     // Add Swagger/OpenAPI with professional configuration
     builder.Services.AddEndpointsApiExplorer();
@@ -238,12 +263,14 @@ try
         using (var scope = app.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<ReservationDbContext>();
+            var identityContext = scope.ServiceProvider.GetRequiredService<IdentityContext>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-            
+
             try
             {
                 logger.LogInformation("Attempting to migrate database...");
                 await dbContext.Database.MigrateAsync();
+                await identityContext.Database.MigrateAsync();
                 logger.LogInformation("Database migration completed successfully");
             }
             catch (Exception ex)

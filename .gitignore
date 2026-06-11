@@ -53,6 +53,8 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-# env files
-.env*
+
+# Environment variables (local secrets, used by docker compose)
+.env
+.env.*
 !.env.example

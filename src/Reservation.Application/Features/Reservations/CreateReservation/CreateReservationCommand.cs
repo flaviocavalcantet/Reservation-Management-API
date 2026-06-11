@@ -1,4 +1,5 @@
 using Reservation.Application.Abstractions;
+using Reservation.Application.Caching;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
 using Reservation.Domain.Exceptions;
@@ -41,15 +42,18 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
 {
     private readonly IReservationRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheInvalidationStrategy _cacheInvalidation;
     private readonly ILogger<CreateReservationHandler> _logger;
 
     public CreateReservationHandler(
         IReservationRepository repository,
         IUnitOfWork unitOfWork,
+        ICacheInvalidationStrategy cacheInvalidation,
         ILogger<CreateReservationHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _cacheInvalidation = cacheInvalidation;
         _logger = logger;
     }
 
@@ -88,7 +92,10 @@ public class CreateReservationHandler : ICommandHandler<CreateReservationCommand
                 reservation.Id,
                 command.CustomerId);
 
-            // 4. Return success DTO
+            // 4. Invalidate caches affected by the new reservation
+            await _cacheInvalidation.InvalidateReservationCreatedAsync(command.CustomerId, cancellationToken);
+
+            // 5. Return success DTO
             return ReservationDtoMapping.ToSuccessResult(reservation);
         }
         catch (DomainValidationException ex)

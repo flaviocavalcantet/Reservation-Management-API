@@ -9,12 +9,14 @@ COPY ["src/Reservation.API/Reservation.API.csproj", "src/Reservation.API/"]
 COPY ["src/Reservation.Application/Reservation.Application.csproj", "src/Reservation.Application/"]
 COPY ["src/Reservation.Domain/Reservation.Domain.csproj", "src/Reservation.Domain/"]
 COPY ["src/Reservation.Infrastructure/Reservation.Infrastructure.csproj", "src/Reservation.Infrastructure/"]
+COPY ["tests/Reservation.Tests/Reservation.Tests.csproj", "tests/Reservation.Tests/"]
 
 # Restore dependencies
 RUN dotnet restore "ReservationManagement.sln"
 
 # Copy all source code
 COPY ["src/", "src/"]
+COPY ["tests/", "tests/"]
 
 # Build the solution
 RUN dotnet build "ReservationManagement.sln" -c Release -o /app/build
