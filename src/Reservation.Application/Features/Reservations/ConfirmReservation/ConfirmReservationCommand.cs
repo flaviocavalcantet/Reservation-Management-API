@@ -1,4 +1,5 @@
 using Reservation.Application.Abstractions;
+using Reservation.Application.Caching;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Abstractions;
 using Reservation.Domain.Exceptions;
@@ -31,15 +32,18 @@ public class ConfirmReservationHandler : ICommandHandler<ConfirmReservationComma
 {
     private readonly IReservationRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheInvalidationStrategy _cacheInvalidation;
     private readonly ILogger<ConfirmReservationHandler> _logger;
 
     public ConfirmReservationHandler(
         IReservationRepository repository,
         IUnitOfWork unitOfWork,
+        ICacheInvalidationStrategy cacheInvalidation,
         ILogger<ConfirmReservationHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _cacheInvalidation = cacheInvalidation;
         _logger = logger;
     }
 
@@ -81,7 +85,13 @@ public class ConfirmReservationHandler : ICommandHandler<ConfirmReservationComma
                 "Reservation {ReservationId} confirmed successfully",
                 command.ReservationId);
 
-            // 4. Return success DTO
+            // 4. Invalidate caches affected by the status change
+            await _cacheInvalidation.InvalidateReservationConfirmedAsync(
+                reservation.Id,
+                reservation.CustomerId,
+                cancellationToken);
+
+            // 5. Return success DTO
             return ReservationDtoMapping.ToSuccessResult(reservation);
         }
         catch (AggregateNotFoundException ex)

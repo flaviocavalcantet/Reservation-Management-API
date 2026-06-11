@@ -48,6 +48,9 @@ public class JwtTokenService : ITokenService
         _tokenHandler = new JwtSecurityTokenHandler();
     }
 
+    /// <inheritdoc />
+    public int AccessTokenExpirationSeconds => _jwtSettings.AccessTokenExpirationMinutes * 60;
+
     /// <summary>
     /// Generates a JWT access token for the given user.
     /// 

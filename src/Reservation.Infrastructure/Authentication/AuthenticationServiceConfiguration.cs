@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -63,7 +64,8 @@ public static class AuthenticationServiceConfiguration
     public static IServiceCollection AddAuthenticationServices(
         this IServiceCollection services,
         IConfiguration configuration,
-        JwtSettings jwtSettings)
+        JwtSettings jwtSettings,
+        Auth0Settings? auth0Settings = null)
     {
         // Register token service in DI
         // ITokenService is used by handlers to generate/validate tokens
@@ -72,15 +74,41 @@ public static class AuthenticationServiceConfiguration
         // Get secret key from configuration
         var key = Encoding.ASCII.GetBytes(jwtSettings.SecretKey);
 
+        auth0Settings ??= configuration.GetSection("Auth0Settings").Get<Auth0Settings>() ?? new Auth0Settings();
+        auth0Settings.Validate();
+
         // Configure JWT Bearer authentication
-        services.AddAuthentication(options =>
+        var authenticationBuilder = services.AddAuthentication(options =>
         {
-            // Set the default authentication scheme
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-        })
-        .AddJwtBearer(options =>
+            if (auth0Settings.IsConfigured)
+            {
+                // Both schemes are registered; route each request to the
+                // scheme matching the token's issuer ("smart" policy scheme).
+                options.DefaultAuthenticateScheme = "smart";
+                options.DefaultChallengeScheme = "smart";
+                options.DefaultScheme = "smart";
+            }
+            else
+            {
+                // Auth0 not configured - preserve existing single-scheme behavior.
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            }
+        });
+
+        if (auth0Settings.IsConfigured)
+        {
+            authenticationBuilder.AddPolicyScheme("smart", "Custom JWT or Auth0", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                    AuthenticationSchemeSelector.SelectScheme(
+                        context.Request.Headers.Authorization.FirstOrDefault(),
+                        auth0Settings.Authority);
+            });
+        }
+
+        authenticationBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
             // Token validation parameters
             options.TokenValidationParameters = new TokenValidationParameters
@@ -174,6 +202,56 @@ public static class AuthenticationServiceConfiguration
             // Require HTTPS for production
             options.RequireHttpsMetadata = !IsEnvironmentDevelopment();
         });
+
+        // ============= AUTH0 (OIDC) JWT BEARER AUTHENTICATION =============
+        // Second scheme: validates RS256 access tokens issued by Auth0 via the
+        // Authorization Code + PKCE flow. Only registered when Auth0Settings.Authority
+        // is configured - keeps the feature opt-in and leaves environments without
+        // an Auth0 tenant (tests, CI, local dev) running with the custom JWT scheme only.
+        if (auth0Settings.IsConfigured)
+        {
+            authenticationBuilder.AddJwtBearer("Auth0", options =>
+            {
+                // Authority enables automatic discovery of Auth0's signing keys (JWKS)
+                // via /.well-known/openid-configuration.
+                options.Authority = auth0Settings.Authority;
+                options.Audience = auth0Settings.Audience;
+                options.RequireHttpsMetadata = !IsEnvironmentDevelopment();
+
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = auth0Settings.Authority,
+                    ValidateAudience = true,
+                    ValidAudience = auth0Settings.Audience,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+
+                    // Map Auth0 claims onto the same claim types used by the custom
+                    // JWT scheme so existing [Authorize(Roles = "...")] checks and
+                    // ClaimTypes.NameIdentifier-based user lookups keep working.
+                    NameClaimType = ClaimTypes.NameIdentifier,
+                    RoleClaimType = auth0Settings.RoleClaimType
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnAuthenticationFailed = context =>
+                    {
+                        if (context.Exception is SecurityTokenExpiredException)
+                        {
+                            context.Response.Headers["WWW-Authenticate"] = "Bearer error=\"token_expired\"";
+                        }
+                        else
+                        {
+                            context.Response.Headers["WWW-Authenticate"] = "Bearer error=\"invalid_token\"";
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
+            });
+        }
 
         // Register authorization service (required for [Authorize] attribute)
         services.AddAuthorization();
