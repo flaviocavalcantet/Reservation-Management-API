@@ -13,6 +13,6 @@ services:
   reservation-api:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      JwtSettings__SecretKey: "dev-secret-key-not-for-production-use-only-for-testing"
+      JwtSettings__SecretKey: "Tp4Lrq7C1bDoB2/4fYvGDCY3exlWtr1OSL4uv647yTY=" # Example secret key for development
     ports:
       - "8080:8080"

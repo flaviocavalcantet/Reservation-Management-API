@@ -56,7 +56,7 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=ReservationManagement;Username=postgres;Password=postgres"
       ConnectionStrings__Redis: "redis:6379"
-      JwtSettings__SecretKey: "${JWT_SECRET_KEY:-your-secret-key-change-in-production}"
+      JwtSettings__SecretKey: "${JWT_SECRET_KEY:-QD+ZwS/Xd/+BsLAngdV6rHG80bIw8B/sOdvB0cNSJ1A=}" # Example secret key, should be overridden in production with a secure value
       JwtSettings__Issuer: "ReservationAPI"
       JwtSettings__Audience: "ReservationWebApp"
       JwtSettings__AccessTokenExpirationMinutes: "15"
