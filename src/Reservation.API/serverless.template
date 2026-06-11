@@ -1,0 +1,93 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Transform": "AWS::Serverless-2016-10-31",
+  "Description": "Reservation Management API - ASP.NET Core 8 minimal API hosted on AWS Lambda behind an API Gateway HTTP API.",
+  "Parameters": {
+    "FunctionName": {
+      "Type": "String",
+      "Default": "reservation-management-api",
+      "Description": "Name of the Lambda function."
+    },
+    "MemorySize": {
+      "Type": "Number",
+      "Default": 1024,
+      "Description": "Lambda memory in MB. More memory also means more vCPU - 1024+ recommended for ASP.NET Core cold starts."
+    },
+    "Timeout": {
+      "Type": "Number",
+      "Default": 30,
+      "Description": "Lambda timeout in seconds. API Gateway caps request duration at 29 seconds."
+    },
+    "DbConnectionString": {
+      "Type": "String",
+      "NoEcho": true,
+      "Default": "REPLACE_ME-Host=your-rds-endpoint;Port=5432;Database=ReservationManagement;Username=app;Password=secret",
+      "Description": "PostgreSQL connection string (prefer SSM Parameter Store / Secrets Manager in Phase 4)."
+    },
+    "JwtSecretKey": {
+      "Type": "String",
+      "NoEcho": true,
+      "Default": "REPLACE_ME-minimum-32-character-secret-key-here",
+      "Description": "Symmetric signing key for the custom JWT scheme."
+    },
+    "Auth0Authority": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Auth0 authority URL (e.g. https://your-tenant.us.auth0.com/). Leave empty to disable the Auth0 scheme."
+    },
+    "Auth0Audience": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Auth0 API audience identifier. Leave empty to disable the Auth0 scheme."
+    }
+  },
+  "Resources": {
+    "ReservationApiFunction": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "FunctionName": { "Ref": "FunctionName" },
+        "Handler": "Reservation.API",
+        "Runtime": "dotnet8",
+        "CodeUri": "",
+        "MemorySize": { "Ref": "MemorySize" },
+        "Timeout": { "Ref": "Timeout" },
+        "Architectures": ["x86_64"],
+        "Policies": ["AWSLambdaBasicExecutionRole"],
+        "Environment": {
+          "Variables": {
+            "ASPNETCORE_ENVIRONMENT": "Production",
+            "ConnectionStrings__DefaultConnection": { "Ref": "DbConnectionString" },
+            "JwtSettings__SecretKey": { "Ref": "JwtSecretKey" },
+            "Auth0Settings__Authority": { "Ref": "Auth0Authority" },
+            "Auth0Settings__Audience": { "Ref": "Auth0Audience" },
+            "CacheOptions__Enabled": "false"
+          }
+        },
+        "Events": {
+          "ProxyResource": {
+            "Type": "HttpApi",
+            "Properties": {
+              "Path": "/{proxy+}",
+              "Method": "ANY"
+            }
+          },
+          "RootResource": {
+            "Type": "HttpApi",
+            "Properties": {
+              "Path": "/",
+              "Method": "ANY"
+            }
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ApiUrl": {
+      "Description": "Invoke URL of the deployed HTTP API.",
+      "Value": {
+        "Fn::Sub": "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+      }
+    }
+  }
+}

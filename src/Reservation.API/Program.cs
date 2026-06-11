@@ -13,15 +13,31 @@ using Serilog;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
+// ============= HOSTING ENVIRONMENT DETECTION =============
+// AWS_LAMBDA_FUNCTION_NAME is set by the Lambda runtime; absent under Kestrel.
+var isRunningInLambda = Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME") is not null;
+
 // ============= STRUCTURED LOGGING CONFIGURATION =============
-// Configure Serilog before building the application
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(new ConfigurationBuilder()
-        .AddJsonFile("appsettings.json")
-        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
-        .AddEnvironmentVariables()
-        .Build())
-    .CreateLogger();
+// Configure Serilog before building the application.
+// In Lambda the filesystem is read-only (except /tmp), so the file sink from
+// appsettings.json is replaced with a console-only logger - stdout is captured
+// by CloudWatch Logs automatically.
+Log.Logger = isRunningInLambda
+    ? new LoggerConfiguration()
+        .MinimumLevel.Information()
+        .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+        .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .WriteTo.Console(outputTemplate: "[{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}")
+        .CreateLogger()
+    : new LoggerConfiguration()
+        .ReadFrom.Configuration(new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json")
+            .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build())
+        .CreateLogger();
 
 try
 {
@@ -33,6 +49,13 @@ try
     // ============= SERILOG INTEGRATION =============
     // Replace default logging with Serilog
     builder.Host.UseSerilog();
+
+    // ============= AWS LAMBDA HOSTING =============
+    // Enables running this API as a Lambda function behind API Gateway (HTTP API / v2 payload).
+    // This call is a no-op when not running inside the Lambda runtime, so local
+    // development with `dotnet run` (Kestrel) is completely unaffected.
+    // Switch to LambdaEventSource.RestApi if fronted by an API Gateway REST API instead.
+    builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 
     // ============= DEPENDENCY INJECTION CONFIGURATION =============
     // Follows Clean Architecture principle: Only Application layer knows about Domain layer
@@ -235,7 +258,12 @@ try
         Log.Information("Development environment detected - Swagger UI enabled at /swagger");
     }
 
-    app.UseHttpsRedirection();
+    // TLS is terminated at API Gateway when running in Lambda; redirecting there
+    // would loop because Lambda only ever sees plain HTTP requests.
+    if (!isRunningInLambda)
+    {
+        app.UseHttpsRedirection();
+    }
 
     // ============= AUTHENTICATION & AUTHORIZATION MIDDLEWARE =============
     // CRITICAL: UseAuthentication MUST come before UseAuthorization
