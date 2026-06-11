@@ -23,6 +23,23 @@ services:
       - reservation_network
     restart: unless-stopped
 
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: reservation-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reservation_network
+    restart: unless-stopped
+
   # Reservation API
   reservation-api:
     build:
@@ -32,10 +49,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=ReservationManagement;Username=postgres;Password=postgres"
+      ConnectionStrings__Redis: "redis:6379"
       JwtSettings__SecretKey: "${JWT_SECRET_KEY:-your-secret-key-change-in-production}"
       JwtSettings__Issuer: "ReservationAPI"
       JwtSettings__Audience: "ReservationWebApp"
@@ -59,6 +79,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:

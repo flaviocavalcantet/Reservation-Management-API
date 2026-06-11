@@ -1,4 +1,5 @@
 using Reservation.Application.Abstractions;
+using Reservation.Application.Caching;
 using Reservation.Application.DTOs;
 using Reservation.Domain.Reservations;
 using Microsoft.Extensions.Logging;
@@ -31,14 +32,20 @@ public record GetReservationsQuery(
 /// </summary>
 public class GetReservationsHandler : IQueryHandler<GetReservationsQuery, IEnumerable<ReservationDto>>
 {
+    /// <summary>TTL for cached customer reservation lists.</summary>
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
     private readonly IReservationRepository _repository;
+    private readonly ICacheService _cacheService;
     private readonly ILogger<GetReservationsHandler> _logger;
 
     public GetReservationsHandler(
         IReservationRepository repository,
+        ICacheService cacheService,
         ILogger<GetReservationsHandler> logger)
     {
         _repository = repository;
+        _cacheService = cacheService;
         _logger = logger;
     }
 
@@ -52,6 +59,19 @@ public class GetReservationsHandler : IQueryHandler<GetReservationsQuery, IEnume
 
         try
         {
+            var cacheKey = ReservationCacheKeys.CustomerReservations(query.CustomerId);
+
+            var cached = await _cacheService.GetAsync<List<ReservationDto>>(cacheKey, cancellationToken);
+            if (cached is not null)
+            {
+                _logger.LogDebug(
+                    "Cache hit for customer {CustomerId} reservations ({Count} items)",
+                    query.CustomerId,
+                    cached.Count);
+
+                return cached;
+            }
+
             // Query the repository for this customer's reservations
             var reservations = await _repository.GetByCustomerIdAsync(
                 query.CustomerId,
@@ -70,9 +90,13 @@ public class GetReservationsHandler : IQueryHandler<GetReservationsQuery, IEnume
                 string.Join(", ", reservationList.Select(r => r.Status.Value)));
 
             // Map domain entities to DTOs for API response
-            return reservationList
+            var dtoList = reservationList
                 .Select(r => ReservationDtoMapping.ToDto(r))
                 .ToList();
+
+            await _cacheService.SetAsync(cacheKey, dtoList, CacheTtl, cancellationToken);
+
+            return dtoList;
         }
         catch (Exception ex)
         {

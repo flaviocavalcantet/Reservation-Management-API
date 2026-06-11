@@ -59,6 +59,12 @@ public interface ITokenService
     string GenerateAccessToken(IApplicationUser user, IEnumerable<string> roles);
 
     /// <summary>
+    /// Gets the configured access token lifetime, in seconds.
+    /// Used to populate the "expiresIn" field returned to clients on login/register.
+    /// </summary>
+    int AccessTokenExpirationSeconds { get; }
+
+    /// <summary>
     /// Generates a new refresh token for obtaining new access tokens.
     /// 
     /// Refresh tokens are:

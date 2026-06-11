@@ -43,9 +43,6 @@ public class IdentityContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     {
         base.OnModelCreating(modelBuilder);
 
-        // Apply custom Identity configurations from this assembly
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityContext).Assembly);
-
         // Configure PostgreSQL-specific table naming
         // This ensures tables are created with proper PostgreSQL conventions
         modelBuilder.HasDefaultSchema("public");

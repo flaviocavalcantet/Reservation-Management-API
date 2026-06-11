@@ -32,13 +32,11 @@ public interface ICacheInvalidationStrategy
 {
     /// <summary>
     /// Invalidates cache entries when a new reservation is created.
-    /// 
+    ///
     /// Invalidation Cascades:
+    /// - Customer's reservation list (list includes all statuses, including newly created)
     /// - All date range availability caches (new reservation affects availability)
     /// - Customer's active reservation count (count increased)
-    /// 
-    /// NOT invalidated:
-    /// - Customer's reservation list (new res not confirmed yet)
     /// </summary>
     /// <param name="customerId">Customer who created the reservation</param>
     /// <param name="cancellationToken">Cancellation token</param>
