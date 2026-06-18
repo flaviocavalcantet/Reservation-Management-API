@@ -145,12 +145,23 @@ public static class AuthenticationServiceConfiguration
                 // Called when token validation succeeds
                 OnTokenValidated = context =>
                 {
-                    // Token is already validated at this point
-                    // Can add additional logic here:
+                    // Reject refresh tokens presented as API access tokens. Refresh
+                    // tokens are signed with the same key and share issuer/audience,
+                    // so they would otherwise pass standard Bearer validation. They
+                    // are only valid at the /refresh endpoint.
+                    // (Access tokens issued before "token_type" existed have no such
+                    // claim and are intentionally still accepted.)
+                    var tokenType = context.Principal?.FindFirst(TokenClaims.TokenType)?.Value;
+                    if (string.Equals(tokenType, TokenClaims.RefreshTokenType, StringComparison.Ordinal))
+                    {
+                        context.Fail("Refresh tokens cannot be used to access protected resources.");
+                    }
+
+                    // Other checks can be added here:
                     // - Verify user still exists
                     // - Verify user is not locked out
                     // - Perform audit logging
-                    
+
                     return Task.CompletedTask;
                 },
 

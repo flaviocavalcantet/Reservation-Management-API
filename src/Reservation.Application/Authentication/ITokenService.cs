@@ -81,6 +81,23 @@ public interface ITokenService
     string GenerateRefreshToken(Guid userId);
 
     /// <summary>
+    /// Validates a refresh token and extracts the user id it was issued for.
+    ///
+    /// Validation includes everything <see cref="ValidateToken"/> performs
+    /// (signature, issuer, audience, lifetime) plus a check that the token is
+    /// actually a refresh token - an access token presented here is rejected.
+    ///
+    /// Used by the /refresh endpoint to exchange a valid refresh token for a new
+    /// access token without requiring the user to re-enter credentials.
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to validate.</param>
+    /// <returns>
+    /// The user id embedded in the token if it is a valid, unexpired refresh token;
+    /// otherwise <c>null</c> (invalid signature, expired, wrong token type, or malformed).
+    /// </returns>
+    Guid? ValidateRefreshToken(string refreshToken);
+
+    /// <summary>
     /// Validates a token and extracts its claims.
     /// 
     /// Validation includes:
