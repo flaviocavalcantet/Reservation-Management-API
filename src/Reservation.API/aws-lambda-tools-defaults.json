@@ -1,0 +1,17 @@
+{
+  "Information": [
+    "Defaults for the Amazon.Lambda.Tools CLI (dotnet lambda ...).",
+    "Install with: dotnet tool install -g Amazon.Lambda.Tools",
+    "Deploy the full stack with: dotnet lambda deploy-serverless",
+    "Values here are placeholders - override per environment with CLI flags or edit before deploying."
+  ],
+  "profile": "default",
+  "region": "us-east-1",
+  "configuration": "Release",
+  "framework": "net8.0",
+  "template": "serverless.template",
+  "template-parameters": "FunctionName=reservation-management-api;MemorySize=1024;Timeout=30",
+  "s3-prefix": "reservation-management-api/",
+  "stack-name": "reservation-management-api",
+  "s3-bucket": "REPLACE_ME-your-deployment-artifacts-bucket"
+}

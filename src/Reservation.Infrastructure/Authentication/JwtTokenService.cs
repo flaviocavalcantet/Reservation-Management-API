@@ -90,8 +90,9 @@ public class JwtTokenService : ITokenService
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), // sub
-            new Claim(ClaimTypes.Email, user.Email ?? string.Empty)   // email
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),                  // sub
+            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),                   // email
+            new Claim(TokenClaims.TokenType, TokenClaims.AccessTokenType)              // token_type: access
         };
 
         // Add role claims (multiple claims with same type, one per role)
@@ -143,7 +144,8 @@ public class JwtTokenService : ITokenService
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString()) // sub
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),                    // sub
+            new Claim(TokenClaims.TokenType, TokenClaims.RefreshTokenType)              // token_type: refresh
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
@@ -160,6 +162,30 @@ public class JwtTokenService : ITokenService
 
         var token = _tokenHandler.CreateToken(tokenDescriptor);
         return _tokenHandler.WriteToken(token);
+    }
+
+    /// <summary>
+    /// Validates a refresh token and extracts the user id it was issued for.
+    ///
+    /// Performs the same checks as <see cref="ValidateToken"/> (signature, issuer,
+    /// audience, lifetime) and additionally verifies the "token_type" claim equals
+    /// "refresh". This stops an access token - structurally identical otherwise -
+    /// from being replayed at the /refresh endpoint to mint fresh access tokens.
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to validate.</param>
+    /// <returns>The user id if the token is a valid, unexpired refresh token; otherwise null.</returns>
+    public Guid? ValidateRefreshToken(string refreshToken)
+    {
+        var principal = ValidateToken(refreshToken);
+        if (principal is null)
+            return null;
+
+        var tokenType = principal.FindFirst(TokenClaims.TokenType)?.Value;
+        if (!string.Equals(tokenType, TokenClaims.RefreshTokenType, StringComparison.Ordinal))
+            return null;
+
+        var subject = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(subject, out var userId) ? userId : null;
     }
 
     /// <summary>

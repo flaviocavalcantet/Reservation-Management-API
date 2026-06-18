@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <!-- ASP.NET Core and essential NuGet packages -->
+    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.6" />
